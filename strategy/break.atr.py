@@ -1,0 +1,295 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+
+# 说明：已经尝试过wss订阅kline,但是延迟不是一般的高，根本不是250ms,所以考虑for循环
+
+
+import os
+import sys
+import time
+import json
+import glob
+import logging
+import argparse
+import pandas as pd
+
+from binance.fut.unicm import CoinM
+from binance.constant import ROUND_AT
+from binance.websocket.futures.coin_m.stream import CoinMWSSStreamClient
+
+from binance.tools.data.const import ORDER_KEY
+from binance.tools.data.reader import TickReader
+
+from strategy.common.utils import get_auth_keys
+from strategy.common.utils import on_open, on_close
+from strategy.indicator.common import DNN, UPP, ATR
+
+
+class FakeClient:
+
+    def __init__(self):
+        self.orderid = 0
+
+    def new_order(self, *args, **kw):
+        # logging.info(f'CLIENT[FAKE]|args={args},kw={kw}')
+        self.orderid += 1
+        return {"orderId": self.orderid}
+
+
+def on_bar(cli, kline):
+    if kline[0] != args.last_kline[0]:
+        # update upp/dnn
+        args.upp.update(kline[0],float(args.last_kline[2]))
+        args.dnn.update(kline[0],float(args.last_kline[3]))
+        # update session kline and atr
+        start_t = kline[0] // args.session_interval
+        no = float(kline[1])
+        nh = float(kline[2])
+        nl = float(kline[3])
+        nc = float(kline[4])
+        if start_t != args.start_t:
+            args.atr.update(kline[0], args.high, args.low, args.close)
+            logging.info(
+                f"SESSION[UPDATE]|st={args.start_t},open={args.open},"
+                f"high={args.high},low={args.low},close={args.close},atr={args.atr.value:.6f}")
+            args.open = no
+            args.high = nh
+            args.low = nl
+            args.close = nc
+            args.start_t = start_t
+        else:
+            args.low = min(args.low, nl)
+            args.high = max(args.high, nh)
+            args.close = nc
+        # trade
+        range_t = args.k1 * args.atr.value
+        # long
+        pSide = 'LONG'
+        if args.mp == 0 and args.upp.value - no > range_t:
+            logging.info(f"TRADE[LONG/OPEN]|st={kline[0]},no={no},dnn={args.upp.value:.6f},atr={args.atr.value:.6f}")
+            args.long_id = cli.new_order( # close position
+                symbol=args.symbol, side='BUY', type='LIMIT', price=no,
+                timeInForce='GTC',
+                newClientOrderId=f'{args.stgname}_long_open_{kline[0]}',
+                quantity=args.vol, positionSide=pSide)['orderId']
+            args.mp = 1
+            args.enpp = no
+            # loss
+            spp = args.enpp - args.s1 * args.atr.value
+            spp = round(spp, ROUND_AT[args.symbol])
+            cli.new_order( # close position
+                symbol=args.symbol, side='SELL', type='STOP',
+                price=spp, stopPrice=spp, timeInForce='GTC',
+                newClientOrderId=f'{args.stgname}_long_loss_{args.long_id}',
+                quantity=args.vol, positionSide=pSide)
+            # win
+            spp = args.enpp + args.s2 * args.atr.value
+            spp = round(spp, ROUND_AT[args.symbol])
+            if spp / args.enpp > 1.045:
+                stop_price = round(spp * 0.96, ROUND_AT[args.symbol])
+            else:
+                stop_price = round(0.5 * (args.enpp + spp), ROUND_AT[args.symbol])
+            cli.new_order( # close position
+                symbol=args.symbol, side='SELL', type='STOP',
+                price=spp, stopPrice=stop_price, timeInForce='GTC',
+                newClientOrderId=f'{args.stgname}_long_win_{args.long_id}',
+                quantity=args.vol, positionSide=pSide)
+        # short
+        pSide = 'SHORT'
+        if args.mp == 0 and no - args.dnn.value > range_t:
+            logging.info(f"TRADE[SHORT/OPEN]|st={kline[0]},no={no},dnn={args.dnn.value:.6f},atr={args.atr.value:.6f}")
+            args.short_id = cli.new_order( # close position
+                symbol=args.symbol, side='SELL', type='LIMIT', price=no,
+                timeInForce='GTC',
+                newClientOrderId=f'{args.stgname}_short_open_{kline[0]}',
+                quantity=args.vol, positionSide=pSide)['orderId']
+            args.mp = -1
+            args.enpp = no
+            # loss
+            spp = args.enpp + args.s1 * args.atr.value
+            spp = round(spp, ROUND_AT[args.symbol])
+            cli.new_order( # close position
+                symbol=args.symbol, side='BUY', type='STOP',
+                price=spp, stopPrice=spp, timeInForce='GTC',
+                newClientOrderId=f'{args.stgname}_short_loss_{args.short_id}',
+                quantity=args.vol, positionSide=pSide)
+            # win
+            spp = args.enpp - args.s2 * args.atr.value
+            spp = round(spp, ROUND_AT[args.symbol])
+            if spp / args.enpp < 0.955:
+                stop_price = round(spp * 1.04, ROUND_AT[args.symbol])
+            else:
+                stop_price = round(0.5 * (args.enpp + spp), ROUND_AT[args.symbol])
+            cli.new_order( # close position
+                symbol=args.symbol, side='SELL', type='STOP',
+                price=spp, stopPrice=stop_price, timeInForce='GTC',
+                newClientOrderId=f'{args.stgname}_close_win_{args.short_id}',
+                quantity=args.vol, positionSide=pSide)
+        logging.debug(
+            f"KLINE|--mp={args.mp},t={args.last_kline[0]},o={args.last_kline[1]},"
+            f"h={args.last_kline[2]},l={args.last_kline[3]},c={args.last_kline[4]},"
+            f"upp={args.upp.value},dnn={args.dnn.value},atr={args.atr.value:.6f}")
+    # calculate the market-position
+    if args.mp != 0:
+        # long 
+        nh = float(kline[2])
+        nl = float(kline[3])
+        spp = args.enpp - args.s1 * args.atr.value
+        spp = round(spp, ROUND_AT[args.symbol])
+        if args.mp > 0 and nl <= spp: # 止损
+            args.mp = 0
+            logging.info(f"TRADE[LONG/LOSS]|st={kline[0]},enpp={args.enpp},spp={spp},atr={args.atr.value:.6f}")
+        spp = args.enpp + args.s2 * args.atr.value
+        spp = round(spp, ROUND_AT[args.symbol])
+        if args.mp > 0 and nh >= spp: # 止盈
+            args.mp = 0
+            logging.info(f"TRADE[LONG/WIN]|st={kline[0]},enpp={args.enpp},spp={spp},atr={args.atr.value:.6f}")
+        # short
+        spp = args.enpp + args.s1 * args.atr.value
+        spp = round(spp, ROUND_AT[args.symbol])
+        if args.mp < 0 and nh >= spp: # 止损
+            args.mp = 0
+            logging.info(f"TRADE[SHORT/LOSS]|st={kline[0]},enpp={args.enpp},spp={spp},atr={args.atr.value:.6f}")
+        spp = args.enpp - args.s2 * args.atr.value
+        spp = round(spp, ROUND_AT[args.symbol])
+        if args.mp < 0 and nl <= spp: # 止盈
+            args.mp = 0
+            logging.info(f"TRADE[SHORT/WIN]|st={kline[0]},enpp={args.enpp},spp={spp},atr={args.atr.value:.6f}")
+    args.last_kline = kline
+
+
+def on_message(self, message):
+    message = json.loads(message)
+    etype = message.get('e', '')
+    if etype == 'bookTicker':
+        ask_p = float(message['a'])
+        bid_p = float(message['b'])
+        
+        mprice = round(0.5 * (ask_p + bid_p), ROUND_AT[args.symbol])
+        start_t = message['E'] - message['E'] % 60000
+        if start_t != args.kline[0]:
+            args.kline = [start_t, mprice, mprice, mprice, mprice]
+        else:
+            args.kline[2] = max(args.kline[2], mprice)
+            args.kline[3] = min(args.kline[3], mprice)
+            args.kline[4] = mprice
+        on_bar(client, args.kline)
+
+
+def period2milli_second(period):
+    cnt = int(period[:-1])
+    if period[-1] == 'm':
+        return cnt * 60000
+    if period[-1] == 'h':
+        return cnt * 3600000
+    if period[-1] == 'd':
+        return cnt * 86400000
+    raise ValueError(f'unsupport period:{period}')
+
+
+if __name__ == "__main__":
+    # 网格策略
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--symbol', '-s', type=str, required=True)
+    parser.add_argument('--length', type=int, default=20)
+    parser.add_argument('--k1', type=float, default=0.3)
+    parser.add_argument('--s1', type=float, default=0.9)
+    parser.add_argument('--s2', type=float, default=2.1)
+    parser.add_argument('--mp', type=int, default=0)
+    parser.add_argument('--backtest', action='store_true')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument(
+        '--session-period', type=str, default='8h',
+        help="该参数描述的是大周期长度，本策略中主要用于计算ATR(8h)")
+    parser.add_argument('--vol', '-v', type=int, default=1)
+    parser.add_argument('--stgname', type=str, default='backtest')
+    args = parser.parse_args()
+    # args infer
+    assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
+    args.session_interval = period2milli_second(args.session_period)
+    # global
+    api_key, private_key = get_auth_keys()
+    client = CoinM(
+        api_key=api_key,
+        private_key=private_key,
+    )
+    # logging
+    logging.basicConfig(
+        filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+    # init
+    endTime = None
+    if args.backtest:
+        files = sorted(glob.glob(f'data/*{args.symbol}*.dat.gz'))
+        reader = TickReader(files)
+        for message in reader:
+            break
+        endTime = message[0]
+    # init session params
+    gdf = client.klines(
+        args.symbol, args.session_period,
+        endTime=endTime, limit = args.length + 2)
+    kline = gdf[-1] # 最后一根kline是不完整的
+    args.start_t = kline[0] // args.session_interval
+    args.open = float(kline[1])
+    args.high = float(kline[2])
+    args.low = float(kline[3])
+    args.close = float(kline[4])
+    gdf = pd.DataFrame(
+        gdf[:-1], columns=[
+            'start_t', 'open', 'high', 'low', 'close',
+            'volume', 'end_t', 'amount', 'trade_cnt',
+            'taker_vol', 'taker_amt', 'reserved'
+        ]).astype(float)
+    args.atr = ATR(args.length, gdf)
+    # init bar params
+    df = client.klines(
+        args.symbol, '1m', endTime=endTime, limit = args.length + 2)
+    args.last_kline = df[-1] # 最后一根kline是不完整的
+    df = pd.DataFrame(
+        df[:-1], columns=[
+            'start_t', 'open', 'high', 'low', 'close',
+            'volume', 'end_t', 'amount', 'trade_cnt',
+            'taker_vol', 'taker_amt', 'reserved'
+        ]).astype(float)
+    args.upp = UPP(args.length, df)
+    args.dnn = DNN(args.length, df)
+    logging.info(
+        f'strategy `{args.stgname}` start with length={args.length}, k1={args.k1}, '
+        f's1={args.s1}, s2={args.s2}, upp={args.upp.value}, dnn={args.dnn.value}, '
+        f'atr={args.atr.value:.6f}, start_t={args.last_kline[0]}'
+    )
+    # send request by period client
+    args.kline = [
+        args.last_kline[0], float(args.last_kline[1]),
+        float(args.last_kline[2]), float(args.last_kline[3]),
+        float(args.last_kline[4])]
+    if args.backtest:
+        client = FakeClient()
+        for message in reader:
+            message = dict(zip(ORDER_KEY, message))
+            message['e'] = 'bookTicker'
+            on_message(None, json.dumps(message))
+    else:
+        if 'lilith' in args.stgname:
+            # create wedsocket stream client
+            wscli = CoinMWSSStreamClient(
+                on_open=on_open,
+                on_close=on_close,
+                on_message=on_message)
+            wscli.book_ticker(args.symbol)
+            while True:
+                time.sleep(3599)
+            # client.renew_listen_key(listen_key)
+        elif 'adam' in args.stgname:
+            while True:
+                try:
+                    kline = client.klines(args.symbol, '1m', limit=1)[0]
+                    on_bar(client, kline)
+                    time.sleep(0.2) # 200ms
+                except Exception as e:
+                    logging.exception(f"on_bar failed with error:{e}")
+                # client.renew_listen_key(listen_key)
+        else:
+            raise RuntimeError(
+                f'currently, only `adam` and `lilith were supported but `{args.stgname}` found!')

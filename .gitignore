@@ -1,0 +1,38 @@
+build
+dist
+binance_connector.egg-info/
+__pycache__
+*.pyc
+.tox
+.python-version
+.DS_Store
+
+# Environments
+.env
+.venv
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# document build
+docs/build/
+
+examples/*.ini
+
+# user define
+*.log
+*.ckpt
+*.json
+data
+*.tar.gz
+*.csv
+.conda
+*.swp
+*.hist
+*.pem
+*.key
+dashboard/cert
+backtest
+.ipynb_checkpoints
