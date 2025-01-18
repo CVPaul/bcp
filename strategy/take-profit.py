@@ -2,15 +2,13 @@
 #-*- coding:utf-8 -*-
 
 
-import os
-import sys
-import time
 import json
 import logging
 import argparse
-import pandas as pd
 
-from binance.fut.unicm import CoinM
+from binance.fut.unicm import UniCM
+from binance.fut.coinm import CoinM
+from binance.constant import ROUND_AT
 from datetime import datetime as dt
 from datetime import timedelta as td
 
@@ -20,13 +18,6 @@ from strategy.indicator.common import MA
 from strategy.indicator.common import ATR
 from strategy.common.utils import get_auth_keys
 from strategy.common.utils import on_open, on_close
-
-
-# global
-ROUND_AT = {
-    "BTCUSD_PERP": 1,
-    "DOGEUSD_PERP": 5,
-}
 
 
 lut = 0
