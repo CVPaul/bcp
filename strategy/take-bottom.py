@@ -22,44 +22,9 @@ from binance.websocket.futures.coin_m.stream import CoinMWSSStreamClient
 from binance.tools.data.const import ORDER_KEY
 from binance.tools.data.reader import TickReader
 
-from strategy.common.utils import get_auth_keys
+from strategy.common.utils import load_api_keys
+from strategy.common.utils import HeartBeatThread
 from strategy.common.utils import on_open, on_close
-from strategy.indicator.common import DNN, UPP
-from pymongo import MongoClient, DESCENDING, ReplaceOne
-
-
-class FakeClient:
-
-    def __init__(self):
-        self.orderid = 0
-        self.orders = []
-        self.datetime = None
-
-    def new_order(self, *args, **kw):
-        self.orderid += 1
-        kw['datetime'] = self.datetime
-        self.orders.append(kw)
-        return {"orderId": self.orderid}
-    
-    def profit(self):
-        df = pd.DataFrame(self.orders)
-        df['direction'] = 2 * (df['side'] == 'BUY') - 1
-        df['pos'] = df['direction'].cumsum()
-        df['profit'] = (df.pos * df.price.diff().shift(-1)).cumsum()
-        df['mdd'] = df.profit.expanding().max() - df.profit
-        return df
-
-
-def load_api_keys():
-    path = f'{os.getenv("HOME")}/.vntrader/connect_unifycm.json'
-    with open(path, 'r') as f:
-        config = json.load(f)
-        api_key = config['API Key']
-        private_key = config['API Secret']
-        if os.path.exists(private_key):
-            with open(private_key, 'r') as f:
-                private_key = f.read().strip()
-    return api_key, private_key
 
 
 def on_tick(args, bid_p, ask_p):
@@ -73,6 +38,7 @@ def on_tick(args, bid_p, ask_p):
 
 
 def trade(cli, args, actions, T):
+    hb.keep_alive(T)
     cid = '%s_{}_{}_{}'%(args.stgname)
     for action in actions:
         action['newClientId'] = cid.format(
@@ -93,6 +59,7 @@ def on_message(self, message):
         bid_p = float(message['b'])
         actions = on_tick(args, ask_p, bid_p)
         trade(client, args, actions, message['E'])
+
 
 if __name__ == "__main__":
     # 网格策略
@@ -116,6 +83,9 @@ if __name__ == "__main__":
         api_key=api_key,
         private_key=private_key,
     )
+    # heart beat monitor
+    hb = HeartBeatThread(os.path.basename(__file__), '5s') 
+    hb.start()
     # logging
     logging.basicConfig(
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
