@@ -30,10 +30,14 @@ from strategy.common.utils import on_open, on_close
 def on_tick(args, bid_p, ask_p):
     actions = []
     if not args.enpp:
-        args.enpp = ask_p
+        args.enpp = bid_p
+        logging.info(f"init the enpp={bid_p}")
+    if bid_p > args.enpp:
+        args.enpp = bid_p
+        logging.info(f"update enpp to {args.enpp}")
     if bid_p <= (1.0 - args.k1) * args.enpp:
         args.enpp = bid_p
-        actions.append({'side':'BUY', 'newClientId':'add','type':'MARKET'})
+        actions.append({'side':'BUY', 'newClientId':'add', 'type':'MARKET'})
     return actions
 
 
@@ -46,7 +50,7 @@ def trade(cli, args, actions, T):
         action['quantity'] = args.vol
         action['symbol'] = args.symbol
         cli.new_order(**action)
-        actions['enpp'] = args.enpp
+        action['enpp'] = args.enpp
         logging.info(f'ORDER|{action}')
          
 
@@ -55,19 +59,20 @@ def on_message(self, message):
     message = json.loads(message)
     etype = message.get('e', '')
     if etype == 'bookTicker':
-        ask_p = float(message['a'])
         bid_p = float(message['b'])
-        actions = on_tick(args, ask_p, bid_p)
+        ask_p = float(message['a'])
+        actions = on_tick(args, bid_p, ask_p)
         trade(client, args, actions, message['E'])
 
 
 if __name__ == "__main__":
     # 网格策略
     parser = argparse.ArgumentParser()
-    parser.add_argument('--stgname', type=str, default='backtest')
+    parser.add_argument('--stgname', type=str, required=True)
     parser.add_argument('--symbol', '-s', type=str, required=True)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--enpp', type=float, default=None)
+    parser.add_argument('--hpp', type=float, default=None)
     parser.add_argument('--vol', '-v', type=int, default=1)
     parser.add_argument('--k1', type=float, default=0.3)
     args = parser.parse_args()

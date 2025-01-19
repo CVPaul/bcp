@@ -10,13 +10,19 @@ import pandas as pd
 class Indicator:
 
     def __init__(self, length):
-        self.length = length
+        self.cursor = 0
         self.value = None
-        self.hist = []
-        self.maxlen = max(2*length, 1000000)
+        self.length = length
+        self.hist = np.array([(np.nan, np.nan)] * self.length)
 
     def update(self, *args, **kw):
         raise NotImplementedError('inplement it yourself!')
+
+    def put(self, value):
+        old_val = self.hist[0]
+        self.hist[:-1] = self.hist[1:]
+        self.hist[-1] = value
+        return old_val
 
 
 class MA(Indicator):

@@ -167,7 +167,7 @@ def on_message(self, message):
             args.kline[2] = max(args.kline[2], mprice)
             args.kline[3] = min(args.kline[3], mprice)
             args.kline[4] = mprice
-        actions = on_tick(args, ask_p, bid_p)
+        actions = on_tick(args, bid_p, ask_p)
         trade(client, args, actions, message['E'])
         args.last_kline = args.kline
 

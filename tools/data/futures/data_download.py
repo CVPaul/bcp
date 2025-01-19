@@ -18,7 +18,7 @@ db = mc['ailab'][tp]
 
 # 配置日志记录器
 logging.basicConfig(
-    filename=f'{dt.now().date()}.{tp}.log',  # 日志文件名
+    filename=f'{dt.now().date()}.{tp}.{sys.argv[2]}.log',  # 日志文件名
     filemode='a',            # 文件模式，'a'表示追加模式
     level=logging.INFO,      # 日志级别
     format='%(asctime)s - %(levelname)s - %(message)s'  # 日志格式
@@ -34,14 +34,15 @@ def message_handler(_, message):
         print(f"write message failed with error:{e}!")
 
 
+symbols = sys.argv[2].split('|')
 if tp == 'um':
     client = UMFuturesWebsocketClient(
         on_message=message_handler)
-    symbols = ["ETHUSDT", "ETHUSDT_250328", "ETHUSDT_250627"]
+    # symbols = ["ETHUSDT", "ETHUSDT_250328", "ETHUSDT_250627"]
 elif tp == 'cm':
     client = CMFuturesWebsocketClient(
         on_message=message_handler)
-    symbols = ["DOGEUSD_PERP"] #, "ETHUSD_PERP", "BNBUSD_PERP", "BTCUSD_PERP"]
+    # symbols = ["DOGEUSD_PERP"] #, "ETHUSD_PERP", "BNBUSD_PERP", "BTCUSD_PERP"]
 else:
     raise RuntimeError(f"unsupported type got:{tp}, only `cm`, `um` were allowed!")
 
