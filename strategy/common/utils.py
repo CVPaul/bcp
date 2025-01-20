@@ -12,6 +12,7 @@ import pandas as pd
 
 from email.header import Header
 from email.mime.text import MIMEText
+from websocket import WebSocketConnectionClosedException
 
 
 def get_auth_keys(prefix='strategy'):
@@ -43,8 +44,6 @@ def on_open(self):
 
 
 def on_close(self):
-    self.socket_manager.create_ws_connection()
-    self.socket_manager.start()
     logging.info(f"try to re-connect to server!")
 
 
@@ -72,9 +71,11 @@ class FakeClient:
 
 
 class HeartBeatThread(threading.Thread):
-    def __init__(self, who, freq='1s'):
+    def __init__(self, event, freq='1s'):
         super().__init__()
+        self.event = event
         self.running = True
+        self.stopped = False
         self.freq = float(freq[:-1])
         self.last_heartbeat_time = time.time()
 
@@ -88,17 +89,23 @@ class HeartBeatThread(threading.Thread):
     
     def keep_alive(self, timestamp):
         self.last_heartbeat_time = timestamp /  1000.0
+        if self.stopped:
+            self.stopped = False
+            self.send_email(f'Heartbeat recorverd@{timestamp}')
 
-    def send_email(self):
+    def send_email(self, info=None):
         receivers = ['xianqiu_li@163.com']  # 接收方邮箱
-        mail_host = "smtp.163.com"          # 设置服务器
+        mail_host = "smtp.126.com"          # 设置服务器
         mail_user = "xianqiu_li@126.com"    # 用户名
         mail_pass = "ZEsmCPDYt27dfkKE"      # 口令
 
-        message = MIMEText(f'Heartbeat exceeded {self.freq} seconds', 'plain', 'utf-8')
+        if info is None:
+            self.stopped = True
+            info = f'Heartbeat exceeded {self.freq} seconds'
+        message = MIMEText(info, 'plain', 'utf-8')
         message['From'] = Header("HeartBeat Monitor", 'utf-8')
         message['To'] = Header("Recipient", 'utf-8')
-        subject = 'Heartbeat Alert'
+        subject = f"stop={self.stopped}|{self.event}'s Heartbeat Alert"
         message['Subject'] = Header(subject, 'utf-8')
 
         try:
