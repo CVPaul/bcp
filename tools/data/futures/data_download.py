@@ -50,7 +50,7 @@ else:
 # client.agg_trade(symbol="ETHUSDT")
 
 for symbol in symbols:
-    client.agg_trade(symbol=symbol)
+    # client.agg_trade(symbol=symbol)
     client.book_ticker(symbol=symbol)
     client.partial_book_depth(symbol=symbol, level=20, speed=100)
 
