@@ -9,16 +9,11 @@ import logging
 import argparse
 import pandas as pd
 
-from binance.fut.unicm import CoinM
-from binance.constant import N_MS_PER_SEC
+from binance.fut.coinm import CoinM
 from binance.constant import N_MS_PER_DAY
 
 from datetime import datetime as dt
 from datetime import timedelta as td
-
-from strategy.common.utils import get_auth_keys
-from strategy.common.utils import on_open, on_close
-
 
 # logging
 logging.basicConfig(
@@ -57,11 +52,7 @@ if __name__ == "__main__":
         end_t -= (end_t % N_MS_PER_DAY)
     assert start_t <= end_t
     # create client
-    api_key, private_key = get_auth_keys()
-    cli = CoinM(
-        api_key=api_key,
-        private_key=private_key,
-    )
+    cli = CoinM()
     # start pull data
     data = []
     while start_t < end_t:
