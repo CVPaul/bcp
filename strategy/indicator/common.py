@@ -13,7 +13,7 @@ class Indicator:
         self.cursor = 0
         self.value = None
         self.length = length
-        self.hist = np.array([(np.nan, np.nan)] * self.length)
+        self.hist = [] # np.array([(np.nan, np.nan)] * self.length)
 
     def update(self, *args, **kw):
         raise NotImplementedError('inplement it yourself!')

@@ -54,21 +54,10 @@ class FakeClient:
         return df
 
 
-# def load_api_keys():
-#     path = f'{os.getenv("HOME")}/.vntrader/connect_unifycm.json'
-#     with open(path, 'r') as f:
-#         config = json.load(f)
-#         api_key = config['API Key']
-#         private_key = config['API Secret']
-#         if os.path.exists(private_key):
-#             with open(private_key, 'r') as f:
-#                 private_key = f.read().strip()
-#     return api_key, private_key
-# 
-
 # global vars
 connected = False
 last_check_time = 0
+
 
 def on_open(self):
     global connected
@@ -83,7 +72,7 @@ def on_error(self, e):
         logging.error(f"found that websocket loss it's connection!")
 
 
-def on_tick(args, bid_p, ask_p):
+def on_tick(args, bid_p, ask_p, T):
     actions = []
     no = args.kline[1]
     nh = args.kline[2]
@@ -110,8 +99,11 @@ def on_tick(args, bid_p, ask_p):
             args.high = max(args.high, nh)
             args.close = nc
     # trade
-    args.cond_s = no >= args.upp.value - args.k1 * args.atr.value
-    args.cond_l = no <= args.dnn.value + args.k1 * args.atr.value
+    speed = no / args.mps[-3] - 1.0
+    args.cond_l = speed > args.k1
+    args.cond_s = speed < -args.k1
+    args.lpp = min(bid_p, args.lpp)
+    args.hpp = max(ask_p, args.hpp)
     # long
     if args.mp == 0 and args.cond_l:
         actions.append({
@@ -119,6 +111,8 @@ def on_tick(args, bid_p, ask_p):
             'type':'LIMIT', 'timeInForce':'GTC'})
         args.mp = 1
         args.enpp = no
+        args.entt = T
+        args.hpp = no
     # short
     if args.mp == 0 and args.cond_s:
         actions.append({
@@ -126,28 +120,30 @@ def on_tick(args, bid_p, ask_p):
             'type':'LIMIT', 'timeInForce':'GTC'})
         args.mp = -1
         args.enpp = no
+        args.entt = T
+        args.lpp = no
     # calculate the market-position
     if args.mp != 0:
-        spp = args.enpp - args.s1 * args.atr.value
-        if args.mp > 0 and nl <= spp and not args.cond_l: # 止损
+        if args.mp > 0 and T - args.entt > args.s1 * 60000 and not args.cond_l: # 止损
             args.mp = 0
             actions.append({
-                'side':'SELL', 'price':spp, 'newClientId':'loss',
+                'side':'SELL', 'price':no, 'newClientId':'loss',
                 'type':'LIMIT', 'timeInForce':'GTC'})
-        ppp = args.enpp + args.s2 * args.atr.value
+        # ppp = args.enpp + args.s2 * args.atr.value
+        ppp = args.enpp * (1 + args.s2)
         if args.mp > 0 and nh >= ppp and not args.cond_l: # 止盈
             args.mp = 0
             actions.append({
                 'side':'SELL', 'price':ppp, 'newClientId':'win',
                 'type':'LIMIT', 'timeInForce':'GTC'})
         # short
-        spp = args.enpp + args.s1 * args.atr.value
-        if args.mp < 0 and nh >= spp and not args.cond_s: # 止损
+        if args.mp < 0 and T - args.entt > args.s1 * 60000 and not args.cond_s: # 止损
             args.mp = 0
             actions.append({
-                'side':'BUY', 'price':spp, 'newClientId':'loss',
+                'side':'BUY', 'price':no, 'newClientId':'loss',
                 'type':'LIMIT', 'timeInForce':'GTC'})
-        ppp = args.enpp - args.s2 * args.atr.value
+        # ppp = args.enpp - args.s2 * args.atr.value
+        ppp = args.enpp * (1 - args.s2)
         if args.mp < 0 and nl <= ppp and not args.cond_s: # 止盈
             args.mp = 0
             actions.append({
@@ -183,13 +179,15 @@ def on_message(self, message):
         mprice = round(0.5 * (ask_p + bid_p), ROUND_AT[args.symbol])
         start_t = message['E'] - message['E'] % 60000
         if start_t != args.kline[0]:
+            args.mps.append(mprice)
             args.kline = [start_t, mprice, mprice, mprice, mprice]
         else:
             args.kline[2] = max(args.kline[2], mprice)
             args.kline[3] = min(args.kline[3], mprice)
             args.kline[4] = mprice
-        actions = on_tick(args, bid_p, ask_p)
-        trade(client, args, actions, message['E'])
+        T = message['E']
+        actions = on_tick(args, bid_p, ask_p, T)
+        trade(client, args, actions, T)
         args.last_kline = args.kline
 
 def tick2msg(tick):
@@ -236,6 +234,7 @@ if __name__ == "__main__":
     assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
     args.session_interval = period2milli_second(args.session_period)
     args.cond_l = args.cond_s = False
+    args.hpp = args.lpp = 0
     # global
     api_key, private_key = load_api_keys()
     client = UniCM(
@@ -275,6 +274,7 @@ if __name__ == "__main__":
     df = mdcli.klines(
         args.symbol, '1m', endTime=endTime, limit = args.his_window + 2)
     args.last_kline = df[-1] # 最后一根kline是不完整的
+    args.mps = [float(x[1]) for x in df]
     df = pd.DataFrame(
         df[:-1], columns=[
             'start_t', 'open', 'high', 'low', 'close',

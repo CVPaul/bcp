@@ -3,11 +3,12 @@ import sys
 import time
 import json
 import logging
+sys.path.append('/home/ubuntu')
 
 from pymongo import MongoClient
 from datetime import datetime as dt
 
-from strategy.common.utils import HeartBeatThread
+from bcp.strategy.common.utils import HeartBeatThread
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from binance.websocket.cm_futures.websocket_client import CMFuturesWebsocketClient
 
@@ -36,11 +37,13 @@ logging.basicConfig(
 connected = False
 
 def on_open(self):
+    global connected
     connected = True
     logging.info(f"web socket of {tp}.{sys.argv[2]} opened!")
 
  
 def on_error(self, e):
+    global connected
     if isinstance(e, WebSocketConnectionClosedException):
         connected = False
         logging.error(f"found that websocket loss it's connection!")
@@ -50,8 +53,8 @@ def message_handler(_, message):
     try:
         doc = json.loads(message)
         db.insert_one(doc)
-        if 'E' in message:
-            last_update_time = message['E']
+        if 'E' in doc:
+            last_update_time = doc['E']
             heart_beat.keep_alive(last_update_time)
         count += 1
     except Exception as e:
@@ -86,7 +89,7 @@ def listen(tp, symbols):
 
 last_check_time = 0
 while True:
-    cli = listen()
+    cli = listen(tp, symbols)
     while True:
         time.sleep(1)
         if connected == False:
