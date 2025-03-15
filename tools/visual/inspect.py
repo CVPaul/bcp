@@ -56,6 +56,7 @@ def analysis(df):
         xaxis_rangeslider_visible=False,
         yaxis_title='Price (USD)',
         hovermode='x unified',
-        showlegend=True
+        showlegend=True,
+        height=1600,
     )
     return fig

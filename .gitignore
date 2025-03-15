@@ -32,6 +32,7 @@ examples/*.ini
 *.hist
 *.pem
 *.key
+*.ipynb
 dashboard/cert
 backtest
 .ipynb_checkpoints
