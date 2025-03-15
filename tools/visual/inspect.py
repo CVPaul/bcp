@@ -49,8 +49,8 @@ def analysis(df):
     # Add Buy/Sell signals
     fig.add_trace(
         go.Scatter(
-            x=df[df['buy']]['timestamp'],
-            y=df[df['buy']]['close'],
+            x=df[df['buy'] > 0]['timestamp'],
+            y=df[df['buy'] > 0]['close'],
             mode='markers',
             marker_symbol='triangle-up',
             marker_color='lime',
@@ -60,8 +60,8 @@ def analysis(df):
     )
     fig.add_trace(
         go.Scatter(
-            x=df[df['sell']]['timestamp'],
-            y=df[df['sell']]['close'],
+            x=df[df['sell'] > 0]['timestamp'],
+            y=df[df['sell'] > 0]['close'],
             mode='markers',
         marker_symbol='triangle-down',
         marker_color='blue',
