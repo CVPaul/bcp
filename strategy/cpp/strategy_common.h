@@ -13,6 +13,7 @@ struct Kline {
 struct BacktestResult {
     double balance;
     std::vector<std::tuple<double, double, double>> trades;
+    std::vector<double> balance_history; // 新增字段
 };
 
 class Strategy {

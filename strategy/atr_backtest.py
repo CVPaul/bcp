@@ -84,8 +84,21 @@ def backtest(k=1.5, atr_period=14, stop_loss=0.02, take_profit=0.05):
     
     return balance, trades
 
+import numpy as np
+
 if __name__ == '__main__':
     final_balance, trades = backtest()
     pd.DataFrame(trades).to_csv("trades.csv")
     print(f"Final balance: {final_balance}")
     print(f"Number of trades: {len(trades)}")
+    
+    # 计算夏普率
+    if len(trades) == 0:
+        sharpe_ratio = 0.0
+    else:
+        returns = [t['profit'] for t in trades]
+        avg_return = np.mean(returns)
+        risk_free = 0.0  # 假设无风险利率为0
+        std_dev = np.std(returns)
+        sharpe_ratio = (avg_return - risk_free) / std_dev if std_dev != 0 else 0.0
+    print(f"夏普率: {sharpe_ratio:.4f}")

@@ -9,6 +9,7 @@ ATRStrategy::ATRStrategy(double k, double stop_loss, double take_profit)
 BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) const
 {
     BacktestResult result;
+    result.balance_history.push_back(10000); // Initialize with starting balance
     int position = 0;
     double balance = 10000;
     double entry_price = 0;
@@ -52,6 +53,7 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
                     double factor = entry_price / enatr / 100;
                     profit = ((current_price - entry_price) / entry_price) - 2 * fee;
                     balance *= 1 + profit * factor;
+                    result.balance_history.push_back(balance); // Record new balance
                     result.trades.emplace_back(entry_price, current_price, profit);
                     position = 0;
                     entry_ATR.pop_back();
@@ -65,6 +67,7 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
                     double factor = entry_price / enatr / 100;
                     profit = ((entry_price - current_price) / entry_price) - 2 * fee;
                     balance *= 1 + profit * factor;
+                    result.balance_history.push_back(balance); // Record new balance
                     result.trades.emplace_back(entry_price, current_price, profit);
                     position = 0;
                 }
