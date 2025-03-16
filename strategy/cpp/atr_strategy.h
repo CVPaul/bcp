@@ -8,6 +8,7 @@ private:
     double k_;
     double stop_loss_;
     double take_profit_;
+    mutable std::vector<double> entry_ATR; // 新增
 public:
     ATRStrategy(double k, double stop_loss, double take_profit);
     BacktestResult run(const std::vector<Kline>& data, double fee) const override;

@@ -14,9 +14,13 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
     double entry_price = 0;
     double stop = 0.0;
     double take = 0.0;
+    double enatr = 0.0;
 
     for (const auto &row : data)
     {
+        if (row.ATR <= 1e-8)
+            continue;
+
         if (position == 0)
         {
             if (row.close > row.highest - k_ * row.ATR)
@@ -25,6 +29,7 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
                 entry_price = row.close;
                 stop = entry_price * (1 - stop_loss_);
                 take = entry_price * (1 + take_profit_);
+                enatr = row.ATR;
             }
             else if (row.close < row.lowest + k_ * row.ATR)
             {
@@ -32,6 +37,7 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
                 entry_price = row.close;
                 stop = entry_price * (1 + stop_loss_);
                 take = entry_price * (1 - take_profit_);
+                enatr = row.ATR;
             }
         }
         else
@@ -43,10 +49,12 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
                 if (current_price <= row.highest - k_ * row.ATR ||
                     current_price <= stop || current_price >= take)
                 {
-                    profit = (current_price - entry_price) / entry_price - 2 * fee;
-                    balance *= 1 + profit;
+                    double factor = entry_price / enatr / 100;
+                    profit = ((current_price - entry_price) / entry_price) - 2 * fee;
+                    balance *= 1 + profit * factor;
                     result.trades.emplace_back(entry_price, current_price, profit);
                     position = 0;
+                    entry_ATR.pop_back();
                 }
             }
             else if (position == -1)
@@ -54,8 +62,9 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
                 if (current_price >= row.lowest + k_ * row.ATR ||
                     current_price >= stop || current_price <= take)
                 {
-                    profit = (entry_price - current_price) / entry_price - 2 * fee;
-                    balance *= 1 + profit;
+                    double factor = entry_price / enatr / 100;
+                    profit = ((entry_price - current_price) / entry_price) - 2 * fee;
+                    balance *= 1 + profit * factor;
                     result.trades.emplace_back(entry_price, current_price, profit);
                     position = 0;
                 }
