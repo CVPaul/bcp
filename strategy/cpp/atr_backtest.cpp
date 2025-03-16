@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 {
     int atr_period = 14;
     double fee = 5e-4; // 新增手续费参数
-    int lookback_lens[] = {10, 20}; // , 30, 45, 60};
+    int lookback_lens[] = {10, 20, 30, 45, 60};
     double k_values[] = {1.0, 1.5, 2.0, 2.5, 3.0};
     double stop_loss_values[] = {0.06, 0.07, 0.08, 0.09, 0.1};
     double take_profit_values[] = {0.25, 0.3, 0.35, 0.4};
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
             {
                 for (double tp : take_profit_values)
                 {
-                    ATRStrategy strategy(k, sl + 0.1, tp - 0.2);
+                    ATRStrategy strategy(k, sl, tp);
                     BacktestResult res = strategy.run(data, fee);
                     if (res.balance > best_balance)
                     {
@@ -167,7 +167,24 @@ int main(int argc, char *argv[])
         }
     }
 
-    cout << "Best parameters: k=" << best_k << ", lookback=" << best_lb << ", stop_loss=" << best_stop_loss << ", take_profit=" << best_take_profit << endl;
+    cout << "Best parameters: k=" << best_k << ", lookback=" << best_lb
+         << ", stop_loss=" << best_stop_loss << ", take_profit=" << best_take_profit
+         << ", trade_cnt:" << best_trades.size() << endl;
     cout << "Best balance: " << best_balance << endl;
+
+    ofstream outfile("best_trades.csv");
+    if (outfile.is_open())
+    {
+        outfile << "Entry,Exit,Profit\n";
+        for (const auto &trade : best_trades)
+        {
+            outfile << get<0>(trade) << "," << get<1>(trade) << "," << get<2>(trade) << "\n";
+        }
+        outfile.close();
+    }
+    else
+    {
+        cerr << "Unable to open file for writing.\n";
+    }
     return 0;
 }
