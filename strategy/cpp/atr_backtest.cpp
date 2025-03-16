@@ -7,7 +7,7 @@
 #include "atr_strategy.h"
 using namespace std;
 
-vector<Kline> load_data(char* data_path)
+vector<Kline> load_data(char *data_path)
 {
     sqlite3 *db;
     sqlite3_open(data_path, &db);
@@ -69,11 +69,11 @@ void calculate_ATR(vector<Kline> &data, int period = 14)
     }
 }
 
-void calculate_30m_extremes(vector<Kline> &data)
+void calculate_extremes(vector<Kline> &data, int period = 30)
 {
-    for (size_t i = 0; i < data.size(); i++)
+    for (size_t i = period - 1; i < data.size(); i++)
     {
-        int start = max(0, static_cast<int>(i) - 29);
+        int start = i - period + 1;
         double max_high = 0;
         double min_low = INFINITY;
         for (int j = start; j <= i; j++)
@@ -83,8 +83,8 @@ void calculate_30m_extremes(vector<Kline> &data)
             if (data[j].low < min_low)
                 min_low = data[j].low;
         }
-        data[i].high_30m = max_high;
-        data[i].low_30m = min_low;
+        data[i].highest = max_high;
+        data[i].lowest = min_low;
     }
 }
 
@@ -117,6 +117,7 @@ int main(int argc, char *argv[])
 {
     int atr_period = 14;
     double fee = 5e-4; // 新增手续费参数
+    int lookback_lens[] = {10, 20}; // , 30, 45, 60};
     double k_values[] = {1.0, 1.5, 2.0, 2.5, 3.0};
     double stop_loss_values[] = {0.06, 0.07, 0.08, 0.09, 0.1};
     double take_profit_values[] = {0.25, 0.3, 0.35, 0.4};
@@ -134,34 +135,39 @@ int main(int argc, char *argv[])
     for (size_t i = period; i < data.size(); i++)
         data[i].ATR = aggregated[i / period - 1].ATR;
 
-    // 计算30分钟的高低
-    calculate_30m_extremes(data);
-
     double best_balance = 0;
     std::vector<std::tuple<double, double, double>> best_trades;
+    int best_lb;
     double best_k, best_stop_loss, best_take_profit;
 
-    for (double k : k_values)
+    for (int lb : lookback_lens)
     {
-        for (double sl : stop_loss_values)
+        // 计算高低
+        calculate_extremes(data, lb);
+
+        for (double k : k_values)
         {
-            for (double tp : take_profit_values)
+            for (double sl : stop_loss_values)
             {
-                ATRStrategy strategy(k, sl, tp);
-                BacktestResult res = strategy.run(data, fee);
-                if (res.balance > best_balance)
+                for (double tp : take_profit_values)
                 {
-                    best_balance = res.balance;
-                    best_k = k;
-                    best_stop_loss = sl;
-                    best_take_profit = tp;
-                    best_trades = res.trades;
+                    ATRStrategy strategy(k, sl + 0.1, tp - 0.2);
+                    BacktestResult res = strategy.run(data, fee);
+                    if (res.balance > best_balance)
+                    {
+                        best_balance = res.balance;
+                        best_k = k;
+                        best_lb = lb;
+                        best_stop_loss = sl;
+                        best_take_profit = tp;
+                        best_trades = res.trades;
+                    }
                 }
             }
         }
     }
 
-    cout << "Best parameters: k=" << best_k << ", stop_loss=" << best_stop_loss << ", take_profit=" << best_take_profit << endl;
+    cout << "Best parameters: k=" << best_k << ", lookback=" << best_lb << ", stop_loss=" << best_stop_loss << ", take_profit=" << best_take_profit << endl;
     cout << "Best balance: " << best_balance << endl;
     return 0;
 }

@@ -6,7 +6,7 @@
 
 struct Kline {
     double open, high, low, close;
-    double high_30m, low_30m;
+    double highest, lowest;
     double TR, ATR;
 };
 

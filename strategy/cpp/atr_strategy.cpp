@@ -19,14 +19,14 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
     {
         if (position == 0)
         {
-            if (row.close > row.high_30m - k_ * row.ATR)
+            if (row.close > row.highest - k_ * row.ATR)
             {
                 position = 1;
                 entry_price = row.close;
                 stop = entry_price * (1 - stop_loss_);
                 take = entry_price * (1 + take_profit_);
             }
-            else if (row.close < row.low_30m + k_ * row.ATR)
+            else if (row.close < row.lowest + k_ * row.ATR)
             {
                 position = -1;
                 entry_price = row.close;
@@ -40,7 +40,7 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
             double profit = 0;
             if (position == 1)
             {
-                if (current_price <= row.high_30m - k_ * row.ATR ||
+                if (current_price <= row.highest - k_ * row.ATR ||
                     current_price <= stop || current_price >= take)
                 {
                     profit = (current_price - entry_price) / entry_price - 2 * fee;
@@ -51,7 +51,7 @@ BacktestResult ATRStrategy::run(const std::vector<Kline> &data, double fee) cons
             }
             else if (position == -1)
             {
-                if (current_price >= row.low_30m + k_ * row.ATR ||
+                if (current_price >= row.lowest + k_ * row.ATR ||
                     current_price >= stop || current_price <= take)
                 {
                     profit = (entry_price - current_price) / entry_price - 2 * fee;
