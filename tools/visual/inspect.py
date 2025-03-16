@@ -1,4 +1,6 @@
+import pandas as pd
 import plotly.io as pio
+import plotly.express as px
 import plotly.graph_objects as go
 
 def analysis(df):
@@ -97,7 +99,7 @@ def analysis(df):
             overlaying='y',
             showgrid=False
         ),
-        height=1600,
+        height=1100,
         hovermode='x unified',
         showlegend=True,
         legend=dict(
@@ -108,4 +110,42 @@ def analysis(df):
             x=1
         )
     )
+    return fig
+
+
+def plot_df(df: pd.DataFrame, plot_type: str = 'line', x_col: str = None, y_col: str = None, title: str = '', save_path: str = None):
+    """
+    Plot DataFrame with specified parameters
+    :param df: DataFrame to plot
+    :param plot_type: 'line', 'bar', 'scatter' or 'hist'
+    :param x_col: Column name for x-axis (only for bar/scatter)
+    :param y_col: Column name or list of columns for y-axis
+    :param title: Chart title
+    :param save_path: Path to save plot (if None, display interactively)
+    """
+    if plot_type == 'line':
+        if y_col is None:
+            fig = px.line(df)
+        else:
+            fig = px.line(df, y=y_col)
+    elif plot_type == 'bar':
+        if x_col and y_col:
+            fig = px.bar(df, x=x_col, y=y_col)
+        else:
+            raise ValueError("x_col and y_col required for bar plot")
+    elif plot_type == 'scatter':
+        if x_col and y_col:
+            fig = px.scatter(df, x=x_col, y=y_col)
+        else:
+            raise ValueError("x_col and y_col required for scatter plot")
+    elif plot_type == 'hist':
+        if y_col:
+            fig = px.histogram(df, x=y_col, nbins=20)
+        else:
+            fig = px.histogram(df, nbins=20)
+    else:
+        raise ValueError(f"Unsupported plot_type: {plot_type}")
+    
+    fig.update_layout(title=title)
+
     return fig
