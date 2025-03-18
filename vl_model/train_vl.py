@@ -17,21 +17,18 @@ def main():
     logging.info("Starting training script")
     
     # Configuration
-    data_path = 'strategy/data/historical.pkl'
-    image_dir = 'visualizations/'
+    image_dir = 'data/1h'
     batch_size = 16
     epochs = 10
     learning_rate = 1e-4
     
     # Dataset and Dataloader
-    dataset = VLDataset(data_path, image_dir)
+    dataset = VLDataset(image_dir)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    
     # Model setup
     model = VLModel()
     optimizer = Adam(model.parameters(), lr=learning_rate)
     criterion = MSELoss()
-    
     # Training loop
     for epoch in range(epochs):
         logging.info(f"Epoch {epoch+1}/{epochs}")
@@ -39,18 +36,14 @@ def main():
             images = batch['image']
             text = batch['text']
             labels = batch['label']
-            
             # Forward pass
             outputs = model(images, text)
             loss = criterion(outputs, labels)
-            
             # Backward and optimize
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
             logging.info(f"Loss: {loss.item():.4f}")
-            
         torch.save(model.state_dict(), f'model_epoch_{epoch}.pth')
         logging.info(f"Model saved after epoch {epoch+1}")
         

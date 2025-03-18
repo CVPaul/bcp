@@ -3,6 +3,9 @@ dist
 binance_connector.egg-info/
 __pycache__
 *.pyc
+*.png
+*.jpeg
+*.gif
 .tox
 .python-version
 .DS_Store
