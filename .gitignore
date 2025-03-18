@@ -32,6 +32,7 @@ examples/*.ini
 *.hist
 *.pem
 *.key
+*.pkl
 *.ipynb
 atr_backtest
 dashboard/cert

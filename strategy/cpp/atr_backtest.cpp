@@ -4,7 +4,10 @@
 #include <cmath>
 #include <algorithm>
 #include <fstream>
+
+#include "atr_break.h"
 #include "atr_strategy.h"
+
 using namespace std;
 
 vector<Kline> load_data(char *data_path)
@@ -135,11 +138,11 @@ int main(int argc, char *argv[])
     for (size_t i = period; i < data.size(); i++)
         data[i].ATR = aggregated[i / period - 1].ATR;
 
-double best_balance = 0;
-double best_sharpe = -INFINITY;
-std::vector<std::tuple<double, double, double>> best_trades;
-int best_lb;
-double best_k, best_stop_loss, best_take_profit;
+    double best_balance = 0;
+    double best_sharpe = -INFINITY;
+    std::vector<std::tuple<double, double, double>> best_trades;
+    int best_lb;
+    double best_k, best_stop_loss, best_take_profit;
 
     for (int lb : lookback_lens)
     {
@@ -152,50 +155,55 @@ double best_k, best_stop_loss, best_take_profit;
             {
                 for (double tp : take_profit_values)
                 {
-                    ATRStrategy strategy(k, sl, tp);
+                    // ATRStrategy strategy(k, sl, tp);
+                    ATRBREAKStrategy strategy(k/2, sl, tp * 2);
                     BacktestResult res = strategy.run(data, fee);
-// Compute returns and Sharpe ratio
-vector<double> returns;
-for (size_t i = 1; i < res.balance_history.size(); ++i) {
-    double prev = res.balance_history[i-1];
-    double curr = res.balance_history[i];
-    returns.push_back((curr - prev)/prev);
-}
+                    // Compute returns and Sharpe ratio
+                    vector<double> returns;
+                    for (size_t i = 1; i < res.balance_history.size(); ++i)
+                    {
+                        double prev = res.balance_history[i - 1];
+                        double curr = res.balance_history[i];
+                        returns.push_back((curr - prev) / prev);
+                    }
 
-double mean_return = 0.0;
-for (double r : returns) {
-    mean_return += r;
-}
-mean_return /= returns.size();
+                    double mean_return = 0.0;
+                    for (double r : returns)
+                    {
+                        mean_return += r;
+                    }
+                    mean_return /= returns.size();
 
-double variance = 0.0;
-for (double r : returns) {
-    variance += (r - mean_return)*(r - mean_return);
-}
-variance /= returns.size();
-double std_dev = sqrt(variance);
-double sharpe_ratio = mean_return / std_dev;
+                    double variance = 0.0;
+                    for (double r : returns)
+                    {
+                        variance += (r - mean_return) * (r - mean_return);
+                    }
+                    variance /= returns.size();
+                    double std_dev = sqrt(variance);
+                    double sharpe_ratio = mean_return / std_dev;
 
-// Update best parameters
-if (res.balance > best_balance || (res.balance == best_balance && sharpe_ratio > best_sharpe)) {
-    best_balance = res.balance;
-    best_sharpe = sharpe_ratio;
-    best_k = k;
-    best_lb = lb;
-    best_stop_loss = sl;
-    best_take_profit = tp;
-    best_trades = res.trades;
-}
+                    // Update best parameters
+                    if (res.balance > best_balance || (res.balance == best_balance && sharpe_ratio > best_sharpe))
+                    {
+                        best_balance = res.balance;
+                        best_sharpe = sharpe_ratio;
+                        best_k = k;
+                        best_lb = lb;
+                        best_stop_loss = sl;
+                        best_take_profit = tp;
+                        best_trades = res.trades;
+                    }
                 }
             }
         }
     }
 
-cout << "Best parameters: k=" << best_k << ", lookback=" << best_lb
-     << ", stop_loss=" << best_stop_loss << ", take_profit=" << best_take_profit
-     << ", trade_cnt:" << best_trades.size() << endl;
-cout << "Best balance: " << best_balance << endl;
-cout << "Best Sharpe Ratio: " << best_sharpe << endl;
+    cout << "Best parameters: k=" << best_k << ", lookback=" << best_lb
+         << ", stop_loss=" << best_stop_loss << ", take_profit=" << best_take_profit
+         << ", trade_cnt:" << best_trades.size() << endl;
+    cout << "Best balance: " << best_balance << endl;
+    cout << "Best Sharpe Ratio: " << best_sharpe << endl;
 
     ofstream outfile("best_trades.csv");
     if (outfile.is_open())

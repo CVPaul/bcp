@@ -3,7 +3,7 @@ import plotly.io as pio
 import plotly.express as px
 import plotly.graph_objects as go
 
-def analysis(df):
+def analysis(df, save_path=None):
     fig = go.Figure()
 
     # Add candlestick
@@ -110,6 +110,8 @@ def analysis(df):
             x=1
         )
     )
+    if save_path:
+        fig.write_image(save_path)
     return fig
 
 
@@ -148,4 +150,6 @@ def plot_df(df: pd.DataFrame, plot_type: str = 'line', x_col: str = None, y_col:
     
     fig.update_layout(title=title)
 
+    if save_path:
+        fig.write_image(save_path)
     return fig
