@@ -16,7 +16,7 @@ class VLDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.labels.iloc[idx]
-        path = os.path.join(self.image_dir, f"{row[0]}.png")
+        path = os.path.join(self.image_dir, f"{int(row[0])}.png")
         # Load image and extract features
         image = Image.open(path).convert("RGB")
         text_features = row[1:25].values
