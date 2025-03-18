@@ -14,12 +14,12 @@ class VLModel(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Flatten(),
-            nn.Linear(32*56*56, 256)  # Assuming 224x224 input images
+            nn.Linear(903168, 256)  # Adjusted for 672x672 input images
         )
         
         # Text branch (MLP)
         self.text_encoder = nn.Sequential(
-            nn.Linear(4, 64),  # 4 technical indicators
+            nn.Linear(24, 64),  # 24 technical indicators
             nn.ReLU(),
             nn.Linear(64, 128)
         )

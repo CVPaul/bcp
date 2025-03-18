@@ -2,6 +2,7 @@ import os
 import torch
 import pandas as pd
 from PIL import Image
+from torchvision import transforms
 
 from torch.utils.data import Dataset
 
@@ -23,7 +24,7 @@ class VLDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return {
-            'image': torch.tensor(image, dtype=torch.float32),
+            'image': transforms.ToTensor()(image),
             'text': torch.tensor(text_features, dtype=torch.float32),
             'label': torch.tensor(row[25], dtype=torch.float32) # Target variable for prediction
         }
