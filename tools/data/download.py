@@ -80,6 +80,6 @@ if __name__ == "__main__":
         ])
         df.to_sql('klines', conn, if_exists='append', index=False)
         logging.info(f"{len(df)} rows inserted for {day.date()}")
-        time.sleep(1/40)
+        time.sleep(1/30)
     conn.close()
     logging.info("Data download completed")

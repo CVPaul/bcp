@@ -9,7 +9,13 @@ from torch.utils.data import Dataset
 class VLDataset(Dataset):
     def __init__(self, image_dir, transform=None):
         self.image_dir = image_dir
-        self.transform = transform
+        if transform is None:
+            self.transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+            ])
+        else:
+            self.transform = transform
         self.labels = pd.read_csv(f'{image_dir}/label.csv', header=None)
 
     def __len__(self):
@@ -24,7 +30,7 @@ class VLDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return {
-            'image': transforms.ToTensor()(image),
+            'image': image,
             'text': torch.tensor(text_features, dtype=torch.float32),
             'label': torch.tensor(row[25], dtype=torch.float32) # Target variable for prediction
         }

@@ -6,6 +6,7 @@ __pycache__
 *.png
 *.jpeg
 *.gif
+*.db
 .tox
 .python-version
 .DS_Store
@@ -37,6 +38,10 @@ examples/*.ini
 *.key
 *.pkl
 *.ipynb
+*.pth
+*.pt
+*.jit
+*.onnx
 atr_backtest
 dashboard/cert
 backtest

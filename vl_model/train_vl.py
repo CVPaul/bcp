@@ -24,7 +24,7 @@ def main():
     
     # Dataset and Dataloader
     dataset = VLDataset(image_dir)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
     # Model setup
     model = VLModel().cuda()
     optimizer = Adam(model.parameters(), lr=learning_rate)
@@ -33,10 +33,10 @@ def main():
     for epoch in range(epochs):
         logging.info(f"Epoch {epoch+1}/{epochs}")
         for batch in dataloader:
-            images = batch['image'].cuda()
-            text = batch['text'].cuda()
-            labels = batch['label'].cuda()
-            # Forward passh 
+            images = batch['image'].cuda(non_blocking=True)
+            text = batch['text'].cuda(non_blocking=True)
+            labels = batch['label'].cuda(non_blocking=True)
+            # Forward pass 
             outputs = model(images, text)
             loss = criterion(outputs, labels.unsqueeze(1))
             # Backward and optimize
