@@ -11,7 +11,6 @@ class VLDataset(Dataset):
         self.image_dir = image_dir
         if transform is None:
             self.transform = transforms.Compose([
-                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
             ])
         else:
@@ -26,11 +25,20 @@ class VLDataset(Dataset):
         path = os.path.join(self.image_dir, f"{int(row[0])}.png")
         # Load image and extract features
         image = Image.open(path).convert("RGB")
-        text_features = row[1:25].values
-        if self.transform:
-            image = self.transform(image)
+        patches = []
+        for i in range(3):
+            for j in range(3):
+                left = j * 224
+                upper = i * 224
+                right = left + 224
+                lower = upper + 224
+                patch = image.crop((left, upper, right, lower))
+                if self.transform:
+                    patch = self.transform(patch)
+                patches.append(patch)
+        image_tensor = torch.stack(patches, dim=0)
         return {
-            'image': image,
-            'text': torch.tensor(text_features, dtype=torch.float32),
+            'image': image_tensor,
+            'text': torch.tensor(row[1:25].values, dtype=torch.float32),
             'label': torch.tensor(row[25], dtype=torch.float32) # Target variable for prediction
         }

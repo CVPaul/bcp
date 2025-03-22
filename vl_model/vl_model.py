@@ -14,9 +14,9 @@ class VLModel(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Flatten(),
-            nn.Linear(56*56*32, 128),  # 224x224 → 56x56 feature map
-            nn.Dropout(0.5),
-            nn.Linear(128, 256)
+            nn.Linear(56*56*32, 256),  # After MaxPool2d(2) x2: 224→56 → 56x56 feature map
+            # nn.Dropout(0.5),
+            # nn.Linear(128, 256)
         )
         
         # Text branch (MLP)
@@ -35,8 +35,15 @@ class VLModel(nn.Module):
             nn.Linear(128, 1)  # Final regression output
         )
 
+# Move forward inside the class properly
     def forward(self, image, text):
+        batch_size = image.size(0)
+        # Reshape 5D (B,9,3,224,224) → 4D (B*9,3,224,224)
+        image = image.view(-1, 3, 224, 224)
         image_features = self.image_encoder(image)
+        # Reshape back to (B,9,256) then aggregate
+        image_features = image_features.view(batch_size, 9, 256)
+        image_features = image_features.mean(dim=1)  # (B,256)
         text_features = self.text_encoder(text)
         combined = torch.cat([image_features, text_features], dim=1)
         return self.fc(combined)

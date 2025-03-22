@@ -1,0 +1,3 @@
+Total PNL: $-0.06
+Max Drawdown: -71000100.00%
+Sharpe Ratio: -0.01

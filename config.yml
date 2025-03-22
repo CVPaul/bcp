@@ -1,0 +1,5 @@
+QLIB_DATA:
+  type: SQLLOADER
+  path: data/DOGEUSD_PERP.db
+  instruments: "binance"  # Update this if your data uses a different instrument name
+  calendar: "binance"     # Update this to match your data's calendar
