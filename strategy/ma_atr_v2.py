@@ -47,7 +47,6 @@ def main():
     # args infer
     assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
     api_key, private_key = load_api_keys()
-    print(api_key, private_key)
     client = UniCM(
         api_key=api_key,
         private_key=private_key,
