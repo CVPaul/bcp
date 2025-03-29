@@ -25,23 +25,10 @@ from binance.tools.data.reader import TickReader
 
 from strategy.common.utils import on_open, on_close
 from strategy.indicator.common import DNN, UPP, ATR
+from tools.feishu.sender import send_exception
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--symbol', '-s', type=str, required=True)
-    parser.add_argument('--his-window', type=int, default=7)
-    parser.add_argument('--atr-window', type=int, default=24)
-    parser.add_argument('--k1', type=float, default=0.3)
-    parser.add_argument('--s1', type=float, default=0.9)
-    parser.add_argument('--s2', type=float, default=2.1)
-    parser.add_argument('--k', type=float, required=True, help='ATR multiplier for entry/exit')
-    parser.add_argument('--mp', type=int, default=0)
-    parser.add_argument('--period', type=str, default='1h')
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--vol', '-v', type=int, default=1)
-    parser.add_argument('--stgname', type=str, default='backtest')
-    args = parser.parse_args()
+def main(args):
     # Add 30m tracking variables
     args.atr = ATR(args.atr_window)  # Reinitialize ATR with new period
     # args infer
@@ -79,10 +66,18 @@ def main():
     # trade
     sigs = gdf.SIG.values[-3:]
     order = {"symbol":args.symbol, "quantity": 0, "type": "MARKET", "newOrderRespType": "RESULT"}
-    if pos > -args.vol and (sigs[0] > 0 and sigs[1] > 0) and sigs[2] < -args.k:
+    if args.cond_type == "and":
+        cond_l = (sigs[0] < 0 and sigs[1] < 0)
+        cond_s = (sigs[0] > 0 and sigs[1] > 0)
+    elif args.cond_type == "or":
+        cond_l = (sigs[0] < 0 or sigs[1] < 0)
+        cond_s = (sigs[0] > 0 or sigs[1] > 0)
+    else:
+        raise ValueError(f"unsupported condition type given:`{args.cond_type}`!!!")
+    if pos > -args.vol and cond_s and sigs[2] < -args.k:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos
-    elif pos < args.vol and (sigs[0] < 0 and sigs[1] < 0) and sigs[2] > args.k:
+    elif pos < args.vol and cond_l and sigs[2] > args.k:
         order["side"] = "BUY"
         order['quantity'] = args.vol - pos
     else:
@@ -95,4 +90,19 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--symbol', '-s', type=str, required=True)
+    parser.add_argument('--his-window', type=int, default=7)
+    parser.add_argument('--atr-window', type=int, default=24)
+    parser.add_argument('--cond-type', type=str, required=True)
+    parser.add_argument('--k', type=float, required=True, help='ATR multiplier for entry/exit')
+    parser.add_argument('--mp', type=int, default=0)
+    parser.add_argument('--period', type=str, default='1h')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--vol', '-v', type=int, default=1)
+    parser.add_argument('--stgname', type=str, default='backtest')
+    args = parser.parse_args()
+    try:
+        main(args)
+    except:
+        send_exception(args.symbol)
