@@ -14,6 +14,7 @@ def send_exception(symbol):
     info = {
         "symbol": symbol,
         "datetime": str(dt.now()),
+        "title": f"Trader Exception({symbol})",
         "message":  traceback.format_exc()
     }
     rsp = requests.post(url, json=info)
