@@ -3,8 +3,25 @@
 
 
 import os
+import json
 import logging
 import subprocess as sb
+
+
+CWD = os.path.dirname(__file__)
+
+
+def load_api_keys():
+    path = f'{CWD}/config.json'
+    with open(path, 'r') as f:
+        config = json.load(f)
+        config["API Secret"] = f'{CWD}/secret.txt'
+        api_key = config['API Key']
+        private_key = config['API Secret']
+        if os.path.exists(private_key):
+            with open(private_key, 'r') as f:
+                private_key = f.read().strip()
+    return api_key, private_key
 
 
 def get_auth_keys(src='file'):

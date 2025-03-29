@@ -15,30 +15,6 @@ from email.mime.text import MIMEText
 from websocket import WebSocketConnectionClosedException
 
 
-def get_auth_keys(prefix='strategy'):
-    # ED25519 Keys
-    api_key = f"{prefix}/api_key.txt"
-    with open(api_key) as f:
-        api_key = f.read().strip()
-
-    private_key = f"{prefix}/private_key.pem"
-    with open(private_key, 'rb') as f:
-        private_key = f.read().strip()
-    return api_key, private_key
-
-
-def load_api_keys():
-    path = f'{os.getenv("HOME")}/.vntrader/connect_unifycm.json'
-    with open(path, 'r') as f:
-        config = json.load(f)
-        api_key = config['API Key']
-        private_key = config['API Secret']
-        if os.path.exists(private_key):
-            with open(private_key, 'r') as f:
-                private_key = f.read().strip()
-    return api_key, private_key
-
-
 def on_open(self):
     logging.info("ws is connected!")
 

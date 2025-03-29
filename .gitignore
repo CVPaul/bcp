@@ -41,6 +41,7 @@ examples/*.ini
 *.pth
 *.pt
 *.jit
+*.txt
 *.onnx
 atr_backtest
 dashboard/cert
