@@ -27,8 +27,7 @@ from strategy.common.utils import on_open, on_close
 from strategy.indicator.common import DNN, UPP, ATR
 
 
-if __name__ == "__main__":
-    # 网格策略
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str, required=True)
     parser.add_argument('--his-window', type=int, default=7)
@@ -68,7 +67,8 @@ if __name__ == "__main__":
             'taker_vol', 'taker_amt', 'reserved'
         ]).astype(float)
     gdf['ATR'] = ATR(args.atr_window, gdf).calc(gdf)
-    gdf['SIG'] = gdf.close.rolling(args.his_window).mean().diff() / gdf['ATR']
+    gdf['DIF'] = gdf.close.rolling(args.his_window).mean().diff()
+    gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     # gdf['start_t'] = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
     # get positions
     positions = {}
@@ -78,15 +78,21 @@ if __name__ == "__main__":
     pos = int(positions.get('positionAmt', 0))
     # trade
     sigs = gdf.SIG.values[-3:]
-    order = {"symbol":args.symbol, "side":0, "quantity": args.vol, "type": "MARKET", "newOrderRespType": "RESULT"}
-    if (sigs[0] > 0 and sigs[1] > 0) and sigs[2] < -args.k:
+    order = {"symbol":args.symbol, "quantity": 0, "type": "MARKET", "newOrderRespType": "RESULT"}
+    if pos > -args.vol and (sigs[0] > 0 and sigs[1] > 0) and sigs[2] < -args.k:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos
-    elif (sigs[0] < 0 and sigs[1] < 0) and sigs[2] > args.k:
+    elif pos < args.vol and (sigs[0] < 0 and sigs[1] < 0) and sigs[2] > args.k:
         order["side"] = "BUY"
         order['quantity'] = args.vol - pos
     else:
         logging.info(f"POSITION|{positions}")
-    if order['side'] != 0:
+    if order['quantity'] > 0:
         res = client.new_order(**order)
         logging.info(f"ORDER|{res}")
+    elif order['quantity'] < 0:
+        logging.info(f"ERROR-ORDER|{order}")
+
+
+if __name__ == "__main__":
+    main()
