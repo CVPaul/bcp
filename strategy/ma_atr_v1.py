@@ -14,6 +14,7 @@ import logging
 import argparse
 import pandas as pd
 
+from datetime import datetime as dt
 from binance.fut.coinm import CoinM
 from binance.fut.unicm import UniCM
 from binance.constant import ROUND_AT
@@ -25,12 +26,18 @@ from binance.tools.data.reader import TickReader
 
 from strategy.common.utils import on_open, on_close
 from strategy.indicator.common import DNN, UPP, ATR
+from tools.feishu.sender import send_message
 from tools.feishu.sender import send_exception
 
 
 def main(args):
     # Add 30m tracking variables
     args.atr = ATR(args.atr_window)  # Reinitialize ATR with new period
+    args.time = dt.now()
+    if args.time.minute < 59:
+        return
+    if args.time.second < 57:
+        time.sleep(57 - args.time.second)
     # args infer
     assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
     api_key, private_key = load_api_keys()
@@ -56,7 +63,9 @@ def main(args):
     gdf['ATR'] = ATR(args.atr_window, gdf).calc(gdf)
     gdf['DIF'] = gdf.close.rolling(args.his_window).mean().diff()
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
-    # gdf['start_t'] = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
+    if args.debug:
+        gdf['start_t'] = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
+        print(gdf.dropna())
     # get positions
     positions = {}
     for pos in client.account()['positions']:
@@ -74,6 +83,8 @@ def main(args):
         cond_s = (sigs[0] > 0 or sigs[1] > 0)
     else:
         raise ValueError(f"unsupported condition type given:`{args.cond_type}`!!!")
+    if sigs[1] * sigs[2] < 0:
+        send_message(args.symbol, "Signal Change", f"sigs={sigs.round(4)}")
     if pos > -args.vol and cond_s and sigs[2] < -args.k:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos

@@ -9,13 +9,22 @@ from .const import HOOK_PREFIX
 from datetime import datetime as dt
 
 
-def send_exception(symbol):
-    url = f"{HOOK_PREFIX}/50827e6ac3d3ed1a6cdd31ab04964346"
+NOTICE_ID = "50827e6ac3d3ed1a6cdd31ab04964346"
+
+
+def send_message(symbol, title, message):
+    url = f"{HOOK_PREFIX}/{NOTICE_ID}"
     info = {
         "symbol": symbol,
         "datetime": str(dt.now()),
-        "title": f"Trader Exception({symbol})",
-        "message":  traceback.format_exc()
+        "title": title,
+        "message":  message
     }
-    rsp = requests.post(url, json=info)
-    print(rsp.status_code, rsp.text)
+    return requests.post(url, json=info)
+
+
+def send_exception(symbol):
+    return send_message(
+        symbol,
+        f"Trader Exception({symbol})",
+        traceback.format_exc())
