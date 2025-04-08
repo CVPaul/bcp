@@ -34,9 +34,9 @@ def main(args):
     # Add 30m tracking variables
     args.atr = ATR(args.atr_window)  # Reinitialize ATR with new period
     args.time = dt.now()
-    if args.time.minute < 59:
+    if not args.debug and args.time.minute < 59:
         return
-    if args.time.second < 57:
+    if not args.debug and args.time.second < 57:
         time.sleep(57 - args.time.second)
     # args infer
     assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
@@ -66,6 +66,7 @@ def main(args):
     if args.debug:
         gdf['start_t'] = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
         print(gdf.dropna())
+        return
     # get positions
     positions = {}
     for pos in client.account()['positions']:
