@@ -83,7 +83,7 @@ def main(args):
     order = {"symbol":args.symbol, "quantity": 0, "type": "MARKET", "newOrderRespType": "RESULT"}
     cond_l = (sigs[-4] < 0 and sigs[-3] < 0 and sigs[-2] < 0)
     cond_s = (sigs[-4] > 0 and sigs[-3] > 0 and sigs[-2] > 0)
-    send_message(args.symbol, f"Signal(V3)[{args.stgname}]", f"sigs:{sigs.round(4)}")
+    # send_message(args.symbol, f"Signal(V3)[{args.stgname}]", f"sigs:{sigs.round(4)}")
     if pos > -args.vol and cond_s and sigs[-1] < -args.k:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos

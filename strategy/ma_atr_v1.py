@@ -87,7 +87,7 @@ def main(args):
         cond_s = (sigs[-3] > 0 or sigs[-2] > 0)
     else:
         raise ValueError(f"unsupported condition type given:`{args.cond_type}`!!!")
-    send_message(args.symbol, "Signal(V1)", f"sigs:{sigs.round(4)}")
+    # send_message(args.symbol, "Signal(V1)", f"sigs:{sigs.round(4)}")
     if pos > -args.vol and cond_s and sigs[-1] < -args.k:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos
