@@ -36,7 +36,8 @@ def main(args):
     # Add 30m tracking variables
     args.atr = ATR(args.atr_window)  # Reinitialize ATR with new period
     args.time = dt.now() + td(hours=8)
-    if not args.debug and args.time.minute < 59:
+    assert args.period <= 60, 'period is required to less than 60'
+    if not args.debug and args.time.minute % args.period != args.period - 1:
         return
     if not args.debug and args.time.second < 59:
         time.sleep(59 - args.time.second)
@@ -55,30 +56,28 @@ def main(args):
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
     # init
-    gdf = mdcli.klines(args.symbol, args.period, limit = args.atr_window + 50)
+    gdf = mdcli.klines(args.symbol, f"{args.interval}m", limit = (args.atr_window + 50) * (args.period // args.interval))
     gdf = pd.DataFrame(
-        gdf[:-1], columns=[
+        gdf, columns=[
             'start_t', 'open', 'high', 'low', 'close',
             'volume', 'end_t', 'amount', 'trade_cnt',
             'taker_vol', 'taker_amt', 'reserved'
         ]).astype(float)
+    gdf.index = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
+    gdf = gdf.resample(f'{args.period}T').agg({
+        'start_t':'first', 'open':'first', 'high':'max',
+        'low':'min', 'close':'last', 'volume':'sum'})
     gdf['ATR'] = ATR(args.atr_window, gdf).calc(gdf)
     gdf['DIF'] = gdf.close.rolling(args.his_window).mean().diff()
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
+    # get positions
     pm = PositionManager(args.stgname)
     position = pm.load()
     pos = position['pos']
     orderId = position.get('orderId', 0)
     if args.debug:
-        gdf['start_t'] = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
         print(gdf.dropna())
         return
-    # get positions
-    # positions = {}
-    # for pos in client.account()['positions']:
-    #     if pos['symbol'] == args.symbol:
-    #         positions = pos
-    # pos = int(positions.get('positionAmt', 0))
     # trade
     sigs = gdf.SIG.values[-7:]
     order = {"symbol":args.symbol, "quantity": 0, "type": "MARKET", "newOrderRespType": "RESULT"}
@@ -90,7 +89,7 @@ def main(args):
         cond_s = (sigs[-3] > 0 or sigs[-2] > 0)
     else:
         raise ValueError(f"unsupported condition type given:`{args.cond_type}`!!!")
-    send_message(args.symbol, "Signal(V2)", f"sigs:{sigs.round(4)}")
+    send_message(args.symbol, f"Signal(V2)[{args.stgname}]", f"sigs:{sigs.round(4)}")
     if pos > -args.vol and cond_s and sigs[-1] < -args.k:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos
@@ -140,7 +139,8 @@ if __name__ == "__main__":
     parser.add_argument('--k', type=float, required=True, help='ATR multiplier for entry/exit')
     parser.add_argument('--s1', type=float, required=True, help='take profit ratio')
     parser.add_argument('--mp', type=int, default=0)
-    parser.add_argument('--period', type=str, default='1h')
+    parser.add_argument('--interval', type=int, default=15) # x minutes
+    parser.add_argument('--period', type=int, default=60) # x intervals
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--vol', '-v', type=int, default=1)
     parser.add_argument('--stgname', type=str, default='backtest')
