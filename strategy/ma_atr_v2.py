@@ -76,6 +76,8 @@ def main(args):
     pos = position['pos']
     orderId = position.get('orderId', 0)
     if args.debug:
+        gdf['buy'] = (gdf.SIG.shift(2) < 0) & (gdf.SIG.shift(1) < 0) & (gdf.SIG > args.k)
+        gdf['sell'] = (gdf.SIG.shift(2) > 0) & (gdf.SIG.shift(1) > 0) & (gdf.SIG < -args.k)
         print(gdf.dropna())
         return
     # trade

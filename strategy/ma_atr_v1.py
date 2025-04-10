@@ -66,6 +66,8 @@ def main(args):
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     if args.debug:
         gdf['start_t'] = pd.to_datetime(gdf.start_t + 8 * 3600000, unit='ms')
+        gdf['buy'] = (gdf.SIG.shift(2) < 0) & (gdf.SIG.shift(1) < 0) & (gdf.SIG > args.k)
+        gdf['sell'] = (gdf.SIG.shift(2) > 0) & (gdf.SIG.shift(1) > 0) & (gdf.SIG < -args.k)
         print(gdf.dropna())
         return
     # get positions
@@ -98,9 +100,10 @@ def main(args):
         logging.info(f"POSITION|{pos}")
     if order['quantity'] > 0:
         res = client.new_order(**order)
-        pm.save({
-            'pos':order['quantity'] if order['side'] == 'BUY' else -order['quantity'],
-            'price':float(res['avgPrice'])
+        pm.save({ # 这里的order是止盈，所以和原始order是反的
+            'pos':args.vol if order['side'] == 'BUY' else -args.vol,
+            'price':float(res['avgPrice']),
+            'orderId': int(res['OrderId'])
         })
         logging.info(f"ORDER|{res}")
     elif order['quantity'] < 0:
