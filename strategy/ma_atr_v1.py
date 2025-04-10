@@ -100,6 +100,9 @@ def main(args):
         logging.info(f"POSITION|{pos}")
     if order['quantity'] > 0:
         res = client.new_order(**order)
+        avg_price = res['avgPrice']
+        send_message(
+            args.symbol, f"{args.stgname} open {args.symbol}@{avg_price}", str(order))
         pm.save({ # 这里的order是止盈，所以和原始order是反的
             'pos':args.vol if order['side'] == 'BUY' else -args.vol,
             'price':float(res['avgPrice']),

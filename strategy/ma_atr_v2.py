@@ -106,9 +106,13 @@ def main(args):
         except Exception as e:
             if e.error_code == -2011: # 'Unknown order sent.'
                 order['quantity'] = args.vol # already take profit traded
+            else:
+                raise e
         res = client.new_order(**order)
         logging.info(f"ORDER|{res}")
-        send_message(args.symbol, "open", str(order))
+        avg_price = res['avgPrice']
+        send_message(
+            args.symbol, f"{args.stgname} open {args.symbol}@{avg_price}", str(order))
         order['type'] = 'LIMIT'
         order['quantity'] = args.vol
         order['newOrderRespType'] = "ACK"
@@ -122,12 +126,12 @@ def main(args):
             pprice = float(res['avgPrice']) * (1 - args.s1)
             order['price'] = round(pprice, ROUND_AT[args.symbol])
         res = client.new_order(**order)
+        logging.info(f"TAKE-PROFIT|{order}|{res}")
         pm.save({ # 这里的order是止盈，所以和原始order是反的
             'pos':args.vol if order['side'] == 'SELL' else -args.vol,
             'orderId': int(res['OrderId'])
         })
-        logging.info(f"TAKE-PROFIT|{order}")
-        send_message(args.symbol, "take-profit", str(order))
+        send_message(args.symbol, f"{args.stgname} take-profit", str(order))
     elif order['quantity'] < 0:
         logging.info(f"ERROR-ORDER|{order}")
 

@@ -53,4 +53,9 @@ if __name__ == "__main__":
         for key, value in rsp[0].items():
             print(f"        - {key}: {value}")
         print(f"        - position: {positions[symbol]}")
+        for order in client.get_open_orders(symbol):
+            print(">" * cutline_len)
+            for key in ['orderId', 'price', 'origQty']:
+                print(f"        - {key}: {order[key]}")
+            print("<" * cutline_len)
     print("=" * cutline_len)

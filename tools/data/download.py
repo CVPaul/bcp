@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # Determine start_time
     if not args.start_time:
-        cursor.execute("SELECT MAX(start_t) FROM klines WHERE symbol=?", (args.symbol,))
+        cursor.execute("SELECT MAX(start_t) FROM klines")
         last_start_t = cursor.fetchone()[0]
         if last_start_t is None:
             raise ValueError(f"No existing data found in database for {args.symbol}")
