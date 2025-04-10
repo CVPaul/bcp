@@ -129,7 +129,7 @@ def main(args):
         logging.info(f"TAKE-PROFIT|{order}|{res}")
         pm.save({ # 这里的order是止盈，所以和原始order是反的
             'pos':args.vol if order['side'] == 'SELL' else -args.vol,
-            'orderId': int(res['OrderId'])
+            'orderId': int(res['orderId'])
         })
         send_message(args.symbol, f"{args.stgname} take-profit", str(order))
     elif order['quantity'] < 0:
