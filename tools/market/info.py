@@ -41,6 +41,20 @@ if __name__ == "__main__":
         private_key=private_key,
     )
     cutline_len = 145
+    # 校准服务器时间和本地时间
+    target_time = int(time.time())
+    target_time = 1000 * (target_time - (target_time % (60 * 60)))
+    for i in range(5):
+        gdf = mdcli.klines(
+            args.symbol, "1h",
+            limit = (10 + 50))
+        if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
+            print(gdf[-1][0], target_time)
+            break
+        print(
+            args.symbol, f"test's marketinfo delay",
+            f"count:{i}\ntarget_time:{target_time}\nsever_time:{gdf[-1][0]}")
+        time.sleep(1)
     print("=" * cutline_len)
     print(f"market info board:")
     positions = {}
