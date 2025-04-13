@@ -33,12 +33,13 @@ if __name__ == "__main__":
         api_key=api_key,
         private_key=private_key)
     cutline_len = 145
+    symbol = "ETH"
     order = {
         "side": "BUY",
-        "symbol":"BNBUSD_PERP",
-        "quantity": 10, "type": "STOP",
-        # "timeInForce": "GTC", "price": 641.44,
-        "stopPrice": 641.44
+        "symbol":f"{symbol}USD_PERP",
+        "quantity": 10, "type": "LIMIT",
+        "timeInForce": "GTC", "price": 1373.26,
     }
-    mdcli.new_order(**order)
+    res = client.new_order(**order)
+    print(res)
     print("=" * cutline_len)
