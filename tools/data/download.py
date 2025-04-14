@@ -9,6 +9,7 @@ import logging
 import argparse
 import pandas as pd
 
+from binance.fut.usdm import USDM
 from binance.fut.coinm import CoinM
 from binance.constant import N_MS_PER_DAY
 
@@ -24,6 +25,8 @@ logging.basicConfig(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str, required=True)
+    parser.add_argument(
+        '--type', type=str, choices=['um', 'cm'], default='cm')
     parser.add_argument('--start-time', type=str)
     parser.add_argument('--end-time', type=str)
     args = parser.parse_args()
@@ -52,7 +55,10 @@ if __name__ == "__main__":
     assert start_t <= end_t, "Invalid time range"
 
     # Initialize client and table
-    cli = CoinM()
+    if args.type == 'cm':
+        cli = CoinM()
+    else:
+        cli = USDM()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS klines (
             start_t INTEGER PRIMARY KEY NOT NULL,

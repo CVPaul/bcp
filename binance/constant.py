@@ -11,6 +11,10 @@ _SPOT_M_API_ = 'api'
 _COIN_M_VER_ = 'v1'
 _COIN_M_API_ = 'dapi'
 
+# usds-m
+_USD_M_VER_ = 'v1'
+_USD_M_API_ = 'fapi'
+
 # UniCM
 _UNI_CM_VER_ = 'v1/cm'
 _UNI_CM_API_ = 'papi'
