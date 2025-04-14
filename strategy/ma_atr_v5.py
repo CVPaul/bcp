@@ -61,9 +61,10 @@ def main(args):
             gdf = mdcli.klines(args.symbol, "1h", limit = args.atr_window + 50)
             if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
                 break
-            send_message(
-                args.symbol, f"{args.stgname}'s marketinfo delay",
-                f"count:{i},target_time:{target_time},sever_time:{gdf[-1][0]}", )
+            if i > 1:
+                send_message(
+                    args.symbol, f"{args.stgname}'s marketinfo delay",
+                    f"count:{i},target_time:{target_time},sever_time:{gdf[-1][0]}", )
             time.sleep(1)
     gdf = pd.DataFrame(
         gdf[:-1], columns=[ # drop the last gdf[-1]
@@ -128,7 +129,7 @@ def main(args):
         logging.info(f"TAKE-PROFIT|{order}|{res}")
         pm.save({ # 这里的order是止盈，所以和原始order是反的
             'pos':args.vol if order['side'] == 'SELL' else -args.vol,
-            'enpp': enpp, 'take-profit price': order['price'],
+            'enpp': enpp, 'pprice': order['price'],
             'orderId': int(res['orderId'])
         })
         send_message(args.symbol, f"{args.stgname} take-profit", str(order))

@@ -33,12 +33,12 @@ if __name__ == "__main__":
         api_key=api_key,
         private_key=private_key)
     cutline_len = 145
-    symbol = "ETH"
+    symbol = "BNB"
     order = {
         "side": "BUY",
         "symbol":f"{symbol}USD_PERP",
         "quantity": 10, "type": "LIMIT",
-        "timeInForce": "GTC", "price": 1373.26,
+        "timeInForce": "GTC", "price": 540.48,
     }
     res = client.new_order(**order)
     print(res)

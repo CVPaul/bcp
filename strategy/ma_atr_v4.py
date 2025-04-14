@@ -61,9 +61,10 @@ def main(args):
             gdf = mdcli.klines(args.symbol, "1h", limit = args.atr_window + 50)
             if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
                 break
-            send_message(
-                args.symbol, f"{args.stgname}'s marketinfo delay",
-                f"count:{i},target_time:{target_time},sever_time:{gdf[-1][0]}", )
+            if i > 1:
+                send_message(
+                    args.symbol, f"{args.stgname}'s marketinfo delay",
+                    f"count:{i},target_time:{target_time},sever_time:{gdf[-1][0]}", )
             time.sleep(1)
     gdf = pd.DataFrame(
         gdf[:-1], columns=[ # drop the last gdf[-1]
