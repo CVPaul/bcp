@@ -26,14 +26,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str, required=True)
     parser.add_argument(
-        '--type', type=str, choices=['um', 'cm'], default='cm')
-    parser.add_argument('--start-time', type=str)
-    parser.add_argument('--end-time', type=str)
+        '--type', '-t', type=str, choices=['um', 'cm'], default='cm')
+    parser.add_argument('--start-time', '-st', type=str)
+    parser.add_argument('--end-time', '-et', type=str)
     args = parser.parse_args()
+    # Initialize client and table
+    if args.type == 'cm':
+        cli = CoinM()
+        args.symbol = f'{args.symbol}USD_PERP'
+    else:
+        cli = USDM()
+        args.symbol = f'{args.symbol}USDT'
     # Database connection
     conn = sqlite3.connect(f"data/{args.symbol}.db")
     cursor = conn.cursor()
-
     # Determine start_time
     if not args.start_time:
         cursor.execute("SELECT MAX(start_t) FROM klines")
@@ -54,11 +60,6 @@ if __name__ == "__main__":
         end_t -= end_t % N_MS_PER_DAY
     assert start_t <= end_t, "Invalid time range"
 
-    # Initialize client and table
-    if args.type == 'cm':
-        cli = CoinM()
-    else:
-        cli = USDM()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS klines (
             start_t INTEGER PRIMARY KEY NOT NULL,

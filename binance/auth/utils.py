@@ -11,7 +11,7 @@ import subprocess as sb
 CWD = os.path.dirname(__file__)
 
 
-def load_api_keys2(which='li'):
+def load_api_keys(which='li'):
     with open(f'{CWD}/{which}.api.txt') as fp:
         api_key = fp.read().strip() 
     with open(f'{CWD}/{which}.prv.txt') as fp:
@@ -19,7 +19,7 @@ def load_api_keys2(which='li'):
     return api_key, private_key
 
 
-def load_api_keys():
+def load_api_keys1():
     path = f'{CWD}/config.json'
     with open(path, 'r') as f:
         config = json.load(f)

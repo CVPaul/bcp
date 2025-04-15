@@ -17,11 +17,23 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 
 from binance.constant import ROUND_AT
-from binance.auth.utils import load_api_keys2
+from binance.auth.utils import load_api_keys
 from binance.websocket.futures.coin_m.stream import CoinMWSSStreamClient
 
 from strategy.indicator.common import MA
 from strategy.indicator.common import ATR
+
+
+def get_lot_size(exchange_info):
+    result = {}
+    symbols = {f'{s}USDT' for s in ['BNB', 'SOL', 'DOGE', 'ETH', 'BTC']}
+    for info in exchange_info['symbols']:
+        if info['symbol'] not in symbols:
+            continue
+        for flt in info['filters']:
+            if flt['filterType'] == 'LOT_SIZE':
+                result[info['symbol']] = float(flt['minQty'])
+    return result
 
 
 if __name__ == "__main__":
@@ -32,22 +44,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.type == 'cm':
-        api_key, private_key = load_api_keys2('li')
+        api_key, private_key = load_api_keys('li')
         client = UniCM(api_key=api_key, private_key=private_key)
         args.symbol = f"{args.symbol.upper()}USD_PERP"
     else:
-        api_key, private_key = load_api_keys2('zhou')
-        print(api_key)
-        print(private_key)
+        api_key, private_key = load_api_keys('zhou')
         client = USDM(api_key=api_key, private_key=private_key)
         args.symbol = f"{args.symbol.upper()}USDT"
     cutline_len = 145
-    order = {
-        "side": "BUY",
-        "symbol": args.symbol,
-        "quantity": 1, "type": "LIMIT",
-        "timeInForce": "GTC", "price": 540.48,
-    }
-    res = client.new_order(**order)
-    print(res)
+    # order = {
+    #     "side": "BUY",
+    #     "symbol": args.symbol,
+    #     "quantity": 1, "type": "LIMIT",
+    #     "timeInForce": "GTC", "price": 540.48,
+    # }
+    # res = client.new_order(**order)
+    # res = client.get_order(args.symbol, orderId=69332236674)
+    res = client.exchange_info(args.symbol)
+    print(get_lot_size(res))
     print("=" * cutline_len)

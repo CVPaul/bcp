@@ -32,6 +32,14 @@ MIN_MOVE = {
     "DOGEUSD_PERP": 0.00001,
 }
 
+LOT_SIZE = {
+    'BTCUSDT': 0.001,
+    'ETHUSDT': 0.001,
+    'BNBUSDT': 0.01,
+    'DOGEUSDT': 1.0,
+    'SOLUSDT': 0.01
+}
+
 # Period
 N_MS_PER_SEC = 1000
 N_MS_PER_DAY = 24 * 3600000 
