@@ -183,7 +183,7 @@ def main(args):
         logging.info(f"STOP|{order}|{res}")
         send_message(args.symbol, f"{args.stgname} stop-order", str(order))
         # ----------------------------------------------------------------------------
-        if order['side'] == 'BUY': # 止盈单
+        if order['side'] == 'SELL': # 止盈单, side已经再上面修改过了
             pprice = enpp * (1 + args.s1)
             order['price'] = round(pprice, ROUND_AT[args.symbol])
         else:
@@ -201,19 +201,19 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--symbol', '-s', type=str, required=True)
-    parser.add_argument('--his-window', type=int, default=7)
-    parser.add_argument('--atr-window', type=int, default=24)
-    parser.add_argument('--k', type=float, required=True, help='ATR multiplier for entry/exit')
-    parser.add_argument('--s1', type=float, required=True, help='take profit ratio')
-    parser.add_argument('--s2', type=float, required=True, help='get loss ratio')
-    parser.add_argument('--mp', type=int, default=0)
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--usd', '-u', type=float, default=100)
-    parser.add_argument('--stgname', type=str, default='backtest')
-    args = parser.parse_args()
     try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--symbol', '-s', type=str, required=True)
+        parser.add_argument('--his-window', type=int, default=7)
+        parser.add_argument('--atr-window', type=int, default=24)
+        parser.add_argument('--k', type=float, required=True, help='ATR multiplier for entry/exit')
+        parser.add_argument('--s1', type=float, required=True, help='take profit ratio')
+        parser.add_argument('--s2', type=float, required=True, help='get loss ratio')
+        parser.add_argument('--mp', type=int, default=0)
+        parser.add_argument('--debug', action='store_true')
+        parser.add_argument('--usd', '-u', type=float, default=100)
+        parser.add_argument('--stgname', type=str, default='backtest')
+        args = parser.parse_args()
         main(args)
     except:
         send_exception(args.symbol)
