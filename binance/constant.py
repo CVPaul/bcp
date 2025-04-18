@@ -21,9 +21,14 @@ _UNI_CM_API_ = 'papi'
 
 # precision: 1/10^{ROUND_AT}
 ROUND_AT = {
+    "BNBUSDT": 2,
+    "BTCUSDT": 1,
+    "DOGEUSDT": 5,
+    "SOLUSDT": 2,
     "BNBUSD_PERP": 2,
     "BTCUSD_PERP": 1,
     "DOGEUSD_PERP": 5,
+    "SOLUSD_PERP": 2,
 }
 
 MIN_MOVE = {

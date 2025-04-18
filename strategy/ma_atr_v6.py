@@ -133,8 +133,11 @@ def main(args):
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     if args.debug:
         gdf = gdf[['start_t','open', 'high', 'low', 'close', 'ATR', 'DIF', 'SIG']]
-        gdf['buy'] = (gdf.SIG.shift(3) < 0) & (gdf.SIG.shift(2) < 0) & (gdf.SIG.shift(1) < 0) & (gdf.SIG > args.k)
-        gdf['sell'] = (gdf.SIG.shift(3) > 0) & (gdf.SIG.shift(2) > 0) & (gdf.SIG.shift(1) > 0) & (gdf.SIG < -args.k)
+        gdf['buy'] =  gdf.SIG > args.k
+        gdf['sell'] = gdf.SIG < -args.k
+        for i in range(args.cond_len):
+            gdf['buy'] = gdf['buy'] & (gdf.SIG.shift(i + 1) < 0)
+            gdf['sell'] = gdf['sell'] & (gdf.SIG.shift(i + 1) > 0)
         gdf['start_t'] = pd.to_datetime(gdf['start_t'], unit='ms')
         print(gdf.dropna())
         return
@@ -143,13 +146,16 @@ def main(args):
     order = {
         "symbol":args.symbol, "quantity": 0, "type": "LIMIT",
         "timeInForce": "GTC", "price": enpp}
-    cond_l = (sigs[-4] < 0 and sigs[-3] < 0 and sigs[-2] < 0)
-    cond_s = (sigs[-4] > 0 and sigs[-3] > 0 and sigs[-2] > 0)
+    cond_l = sigs[-1] > args.k
+    cond_s = sigs[-1] < -args.k
+    for i in range(args.cond_len):
+        cond_l = cond_l and (sigs[-2 - i] < 0)
+        cond_s = cond_s and (sigs[-2 - i] > 0)
     # send_message(args.symbol, f"Signal(V2)[{args.stgname}]", f"sigs:{sigs.round(4)}")
-    if pos > -args.vol and cond_s and sigs[-1] < -args.k:
+    if pos > -args.vol and cond_s:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos
-    elif pos < args.vol and cond_l and sigs[-1] > args.k:
+    elif pos < args.vol and cond_l:
         order["side"] = "BUY"
         order['quantity'] = args.vol - pos
     else:
@@ -166,35 +172,36 @@ def main(args):
             args.symbol, f"{args.stgname} {order['side']} {args.symbol}", str(order))
         order['quantity'] = args.vol
         # ----------------------------------------------------------------------------
-        order['type'] = 'STOP' # 止损单
+        order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
-            sprice = enpp * (1 - args.s2)
-            order['price'] = round(sprice, ROUND_AT[args.symbol])
-            order['stopPrice'] = order['price']
-        else:
-            order['side'] = 'BUY'
-            sprice = enpp * (1 + args.s2)
-            order['price'] = round(sprice, ROUND_AT[args.symbol])
-            order['stopPrice'] = order['price']
-        res = cli.new_order(**order)
-        trade_info['sprice'] = order['price']
-        trade_info['sOrderId'] = res['orderId']
-        logging.info(f"STOP|{order}|{res}")
-        send_message(args.symbol, f"{args.stgname} stop-order", str(order))
-        # ----------------------------------------------------------------------------
-        if order['side'] == 'SELL': # 止盈单, side已经再上面修改过了
             pprice = enpp * (1 + args.s1)
             order['price'] = round(pprice, ROUND_AT[args.symbol])
         else:
+            order['side'] = 'BUY'
             pprice = enpp * (1 - args.s1)
             order['price'] = round(pprice, ROUND_AT[args.symbol])
+        logging.info(f"TAKE-PROFIT|{order}")
         res = cli.new_order(**order)
         trade_info['pprice'] = order['price']
         trade_info['pOrderId'] = res['orderId']
-        logging.info(f"TAKE-PROFIT|{order}|{res}")
-        send_message(args.symbol, f"{args.stgname} take-profit", str(order))
+        send_message(args.symbol, f"{args.stgname} take-profit", str(res))
         # ----------------------------------------------------------------------------
+        order['type'] = 'STOP' # 止损单
+        if order['side'] == 'SELL': # 止盈单, side已经在上面修改过了
+            sprice = enpp * (1 - args.s2)
+            order['price'] = round(sprice, ROUND_AT[args.symbol])
+        else:
+            sprice = enpp * (1 + args.s2)
+            order['price'] = round(sprice, ROUND_AT[args.symbol])
+        order['stopPrice'] = order['price']
+        logging.info(f"STOP|{order}")
+        res = cli.new_order(**order)
+        trade_info['sprice'] = order['price']
+        trade_info['sOrderId'] = res['orderId']
+        send_message(args.symbol, f"{args.stgname} stop-order", str(res))
+        # ----------------------------------------------------------------------------
+        pm.save(trade_info)
 
     elif order['quantity'] < 0:
         logging.info(f"ERROR-ORDER|{order}")
@@ -206,6 +213,7 @@ if __name__ == "__main__":
         parser.add_argument('--symbol', '-s', type=str, required=True)
         parser.add_argument('--his-window', type=int, default=7)
         parser.add_argument('--atr-window', type=int, default=24)
+        parser.add_argument('--cond-len', type=int, default=2)
         parser.add_argument('--k', type=float, required=True, help='ATR multiplier for entry/exit')
         parser.add_argument('--s1', type=float, required=True, help='take profit ratio')
         parser.add_argument('--s2', type=float, required=True, help='get loss ratio')
