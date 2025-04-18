@@ -178,35 +178,36 @@ def main(args):
         send_message(
             args.symbol, f"{args.stgname} {order['side']}@{order['price']}", str(order))
         order['quantity'] = args.vol
+        atr = gdf.ATR.values[-1]
         # ----------------------------------------------------------------------------
         order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
-            pprice = enpp * (1 + args.s1)
+            pprice = enpp + args.s1 * atr
             order['price'] = round(pprice, ROUND_AT[args.symbol])
         else:
             order['side'] = 'BUY'
-            pprice = enpp * (1 - args.s1)
+            pprice = enpp - args.s1 * atr
             order['price'] = round(pprice, ROUND_AT[args.symbol])
         logging.info(f"TAKE-PROFIT|{order}")
         res = cli.new_order(**order)
         trade_info['pprice'] = order['price']
         trade_info['pOrderId'] = res['orderId']
-        send_message(args.symbol, f"{args.stgname} take-profit", str(res))
+        send_message(args.symbol, f"{args.stgname} take-profit({atr=})", str(res))
         # ----------------------------------------------------------------------------
         order['type'] = 'STOP' # 止损单
         if order['side'] == 'SELL': # 止盈单, side已经在上面修改过了
-            sprice = enpp * (1 - args.s2)
+            sprice = enpp - args.s2 * atr
             order['price'] = round(sprice, ROUND_AT[args.symbol])
         else:
-            sprice = enpp * (1 + args.s2)
+            sprice = enpp + args.s2 * atr
             order['price'] = round(sprice, ROUND_AT[args.symbol])
         order['stopPrice'] = order['price']
         logging.info(f"STOP|{order}")
         res = cli.new_order(**order)
         trade_info['sprice'] = order['price']
         trade_info['sOrderId'] = res['orderId']
-        send_message(args.symbol, f"{args.stgname} stop-order", str(res))
+        send_message(args.symbol, f"{args.stgname} stop-order({atr=})", str(res))
         # ----------------------------------------------------------------------------
         pm.save(trade_info)
 
@@ -227,7 +228,7 @@ if __name__ == "__main__":
         parser.add_argument('--mp', type=int, default=0)
         parser.add_argument('--debug', action='store_true')
         parser.add_argument('--usd', '-u', type=float, default=100)
-        parser.add_argument('--vol', '-v', type=int, default=1)
+        parser.add_argument('--vol', '-v', type=float, default=1)
         parser.add_argument('--stgname', type=str, default='backtest')
         args = parser.parse_args()
         args.is_um = not args.symbol.endswith('_PERP')

@@ -45,21 +45,21 @@ if __name__ == "__main__":
 
     if args.type == 'cm':
         api_key, private_key = load_api_keys('li')
-        client = UniCM(api_key=api_key, private_key=private_key)
+        client = CoinM(api_key=api_key, private_key=private_key)
         args.symbol = f"{args.symbol.upper()}USD_PERP"
     else:
         api_key, private_key = load_api_keys('zhou')
         client = USDM(api_key=api_key, private_key=private_key)
         args.symbol = f"{args.symbol.upper()}USDT"
     cutline_len = 145
-    # order = {
-    #     "side": "BUY",
-    #     "symbol": args.symbol,
-    #     "quantity": 1, "type": "LIMIT",
-    #     "timeInForce": "GTC", "price": 540.48,
-    # }
-    # res = client.new_order(**order)
+    order = {
+        "side": "BUY",
+        "symbol": args.symbol,
+        "quantity": 1, "type": "LIMIT",
+        "timeInForce": "GTC", "price": 540.48,
+    }
+    res = client.new_order(**order)
     # res = client.get_order(args.symbol, orderId=69332236674)
-    res = client.exchange_info(args.symbol)
-    print(get_lot_size(res))
+    # res = client.exchange_info(args.symbol)
+    # print(get_lot_size(res))
     print("=" * cutline_len)
