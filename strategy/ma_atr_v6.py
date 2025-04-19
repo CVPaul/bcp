@@ -192,7 +192,7 @@ def main(args):
         res = cli.new_order(**order)
         trade_info['pprice'] = order['price']
         trade_info['pOrderId'] = res['orderId']
-        send_message(args.symbol, f"{args.stgname} take-profit", str(res))
+        send_message(args.symbol, f"{args.stgname} take-profit", str(trade_info))
         # ----------------------------------------------------------------------------
         order['type'] = 'STOP' # 止损单
         if order['side'] == 'SELL': # 止盈单, side已经在上面修改过了
@@ -206,7 +206,7 @@ def main(args):
         res = cli.new_order(**order)
         trade_info['sprice'] = order['price']
         trade_info['sOrderId'] = res['orderId']
-        send_message(args.symbol, f"{args.stgname} stop-order", str(res))
+        send_message(args.symbol, f"{args.stgname} stop-order", str(trade_info))
         # ----------------------------------------------------------------------------
         pm.save(trade_info)
 

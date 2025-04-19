@@ -25,10 +25,12 @@ ROUND_AT = {
     "BTCUSDT": 1,
     "DOGEUSDT": 5,
     "SOLUSDT": 2,
+    "ETHUSDT": 2,
     "BNBUSD_PERP": 2,
     "BTCUSD_PERP": 1,
     "DOGEUSD_PERP": 5,
     "SOLUSD_PERP": 2,
+    "ETHUSD_PERP": 2,
 }
 
 MIN_MOVE = {
