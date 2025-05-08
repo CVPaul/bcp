@@ -1,0 +1,1 @@
+HOOK_PREFIX = "https://www.feishu.cn/flow/api/trigger-webhook"

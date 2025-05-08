@@ -1,0 +1,11 @@
+[theme]
+base = "dark"                   # 设置基本主题，您可以根据需要设置为 "light" 或 "dark"
+primaryColor = "#007ACC"        # 设置主颜色
+backgroundColor = "#1E1E1E"     # 设置背景颜色
+textColor = "#D4D4D4"           # 设置文本颜色
+font = "sans serif"             # 设置字体
+
+[server]
+address = '0.0.0.0'
+sslKeyFile = '/home/ubuntu/binance-connector-python/dashboard/cert/private.key'
+sslCertFile = '/home/ubuntu/binance-connector-python/dashboard/cert/certchain.pem'
