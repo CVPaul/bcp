@@ -21,45 +21,23 @@ _UNI_CM_API_ = 'papi'
 
 # precision: 1/10^{ROUND_AT}
 ROUND_AT = {
-    "BNBUSDT": 2,
-    "BTCUSDT": 1,
-    "DOGEUSDT": 5,
-    "SOLUSDT": 2,
-    "ETHUSDT": 2,
-    "SUIUSDT": 4,
-    "TRUMPUSDT": 3,
-    "BNBUSD_PERP": 2,
-    "BTCUSD_PERP": 1,
-    "DOGEUSD_PERP": 5,
-    "SOLUSD_PERP": 2,
-    "ETHUSD_PERP": 2,
-    "TRUMPUSD_PERP": 3,
-}
-
-MIN_MOVE = {
-    "BNBUSD_PERP": 0.01,
-    "BTCUSD_PERP": 0.1,
-    "DOGEUSD_PERP": 0.00001,
-}
-
-LOT_SIZE = {
-    'BTCUSDT': 0.001,
-    'ETHUSDT': 0.001,
-    'BNBUSDT': 0.01,
-    'DOGEUSDT': 1.0,
-    'SOLUSDT': 0.01,
-    'SUIUSDT': 0.1,
-    'TRUMPUSDT': 0.01,
+    "BNB": 2,
+    "BTC": 1,
+    "DOGE": 5,
+    "SOL": 2,
+    "ETH": 2,
+    "SUI": 4,
+    "TRUMP": 3,
 }
 
 LOT_ROUND_AT = {
-    'BTCUSDT': 3,
-    'ETHUSDT': 3,
-    'BNBUSDT': 2,
-    'DOGEUSDT': 0,
-    'SOLUSDT': 2,
-    'SUIUSDT': 1,
-    'TRUMPUSDT': 2,
+    'BTC': 3,
+    'ETH': 3,
+    'BNB': 2,
+    'DOGE': 0,
+    'SOL': 2,
+    'SUI': 1,
+    'TRUMP': 2,
 }
 # Period
 N_MS_PER_SEC = 1000

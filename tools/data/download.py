@@ -27,16 +27,17 @@ if __name__ == "__main__":
     parser.add_argument('--symbol', '-s', type=str, required=True)
     parser.add_argument(
         '--type', '-t', type=str, choices=['um', 'cm'], default='cm')
+    parser.add_argument('--usx', '-u', type=str, default='USDT')
     parser.add_argument('--start-time', '-st', type=str)
     parser.add_argument('--end-time', '-et', type=str)
     args = parser.parse_args()
     # Initialize client and table
     if args.type == 'cm':
         cli = CoinM()
-        args.symbol = f'{args.symbol}USD_PERP'
+        args.symbol = f'{args.symbol}USD_PERP'.upper()
     else:
         cli = USDM()
-        args.symbol = f'{args.symbol}USDT'
+        args.symbol = f'{args.symbol}{args.usx}'.upper()
     # Database connection
     conn = sqlite3.connect(f"data/{args.symbol}.db")
     cursor = conn.cursor()
@@ -88,7 +89,7 @@ if __name__ == "__main__":
             'taker_vol', 'taker_amt', 'reserved'
         ])
         df.to_sql('klines', conn, if_exists='append', index=False)
-        logging.info(f"{len(df)} rows inserted for {day.date()}")
+        logging.info(f"{len(df)} rows inserted for {args.symbol}@{day.date()}")
         time.sleep(1/30)
     conn.close()
     logging.info("Data download completed")

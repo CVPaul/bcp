@@ -18,13 +18,13 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 from binance.fut.usdm import USDM
 from binance.fut.coinm import CoinM
-from binance.constant import ROUND_AT, LOT_ROUND_AT
 
 from binance.auth.utils import load_api_keys
 from binance.tools.data.const import ORDER_KEY
 from binance.tools.data.reader import TickReader
 from binance.tools.trade.position import PositionManager
 
+from strategy.common.utils import round_at, lot_round_at
 from strategy.common.utils import cancel_all, round_it
 from strategy.common.utils import upated_after_closed
 from strategy.indicator.common import DNN, UPP, ATR
@@ -85,20 +85,20 @@ def main(args):
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     if args.debug:
         gdf = gdf[['start_t','open', 'high', 'low', 'close', 'ATR', 'DIF', 'SIG']]
-        gdf['buy'] =  gdf.SIG > args.k
-        gdf['sell'] = gdf.SIG < -args.k
+        buy =  gdf.SIG > args.k
+        sell = gdf.SIG < -args.k
         for i in range(args.cond_len):
-            gdf['buy'] = gdf['buy'] & (gdf.SIG.shift(i + 1) < 0)
-            gdf['sell'] = gdf['sell'] & (gdf.SIG.shift(i + 1) > 0)
+            buy = buy & (gdf.SIG.shift(i + 1) < 0)
+            sell = sell & (gdf.SIG.shift(i + 1) > 0)
+        gdf['side'] = buy.astype(int) - sell
         gdf['start_t'] = pd.to_datetime(gdf['start_t'], unit='ms') + td(hours=8)
-        print(gdf.dropna())
+        gdf['start_t'] = gdf.start_t.dt.strftime('%d/%H')
+        print(gdf.dropna()[['start_t', 'close', 'ATR', 'DIF', 'SIG', 'side']])
         return
     # trade
     maxlen = max(7, args.cond_len + 1)
     sigs = gdf.SIG.values[-maxlen:]
-    order = {
-        "symbol":args.symbol, "quantity": 0, "type": "LIMIT",
-        "timeInForce": "GTC", "price": round_it(enpp, ROUND_AT[args.symbol])}
+    order = {"symbol":args.symbol, "quantity": 0, "type": "LIMIT", "timeInForce": "GTC"}
     cond_l = sigs[-1] > args.k
     cond_s = sigs[-1] < -args.k
     for i in range(args.cond_len):
@@ -107,15 +107,17 @@ def main(args):
     if pos >= 0 and cond_s:
         order["side"] = "SELL"
         order['quantity'] = args.vol + pos
+        order["price"] = round_it(enpp * (1 + args.profit), round_at(args.symbol))
     elif pos <= 0 and cond_l:
         order["side"] = "BUY"
         order['quantity'] = args.vol - pos
+        order["price"] = round_it(enpp * (1 - args.profit), round_at(args.symbol))
     else:
         logging.info(f"POSITION|{pos}")
     if order['quantity'] > 1e-8:
         if args.is_um:
             order['quantity'] = round_it(
-                order['quantity'], LOT_ROUND_AT[args.symbol])
+                order['quantity'], lot_round_at(args.symbol))
         cancel_all(args, cli, position) # cancel all before new open
         logging.info(f"ORDER|{order}")
         res = cli.new_order(**order)
@@ -126,7 +128,7 @@ def main(args):
         order['quantity'] = args.vol
         if args.is_um:
             order['quantity'] = round_it(
-                args.vol, LOT_ROUND_AT[args.symbol])
+                args.vol, lot_round_at(args.symbol))
         atr = gdf.ATR.values[-1]
         title = f"{args.stgname} {order['side']}@{order['price']}|{atr=:.6f}"
         # ----------------------------------------------------------------------------
@@ -137,33 +139,34 @@ def main(args):
                 pprice = enpp + args.s1 * atr
             else:
                 pprice = enpp * (1 + args.s1)
-            order['price'] = round_it(pprice, ROUND_AT[args.symbol])
+            order['price'] = round_it(pprice, round_at(args.symbol))
         else:
             order['side'] = 'BUY'
             if args.use_atr:
                 pprice = enpp - args.s1 * atr
             else:
                 pprice = enpp * (1 - args.s1)
-            order['price'] = round_it(pprice, ROUND_AT[args.symbol])
+            order['price'] = round_it(pprice, round_at(args.symbol))
         logging.info(f"TAKE-PROFIT|{order}")
         res = cli.new_order(**order)
         trade_info['pprice'] = order['price']
         trade_info['pOrderId'] = res['orderId']
         # ----------------------------------------------------------------------------
         order['type'] = 'STOP' # 止损单
-        if order['side'] == 'SELL': # 止盈单, side已经在上面修改过了
+        if order['side'] == 'SELL': # side已经在上面修改过了
             if args.use_atr:
                 sprice = enpp - args.s2 * atr
             else:
                 sprice = enpp * (1 - args.s2)
-            order['price'] = round_it(sprice, ROUND_AT[args.symbol])
+            order['price'] = round_it(sprice, round_at(args.symbol))
+            order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
         else:
             if args.use_atr:
                 sprice = enpp + args.s2 * atr
             else:
                 sprice = enpp * (1 + args.s2)
-            order['price'] = round_it(sprice, ROUND_AT[args.symbol])
-        order['stopPrice'] = order['price']
+            order['price'] = round_it(sprice, round_at(args.symbol))
+            order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
         logging.info(f"STOP|{order}")
         res = cli.new_order(**order)
         trade_info['sprice'] = order['price']
@@ -190,12 +193,13 @@ if __name__ == "__main__":
         parser.add_argument('--use-atr', action='store_true')
         parser.add_argument('--usd', '-u', type=float, default=100)
         parser.add_argument('--vol', '-v', type=float, default=1)
+        parser.add_argument('--profit', '-p', type=float, default=5e-4)
         parser.add_argument('--stgname', type=str, default='backtest')
         args = parser.parse_args()
         args.is_um = not args.symbol.endswith('_PERP')
         main(args)
     except Exception as e:
-        if e.error_code == -1021: # 已经止损失·
+        if hasattr(e, 'error_code') and e.error_code == -1021: # 已经止损失·
             logging.warning(f"{args.stgname} is timeout")
         else:
             send_exception(args.symbol)

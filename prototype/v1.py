@@ -2,48 +2,35 @@ import pandas as pd
 
 
 def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, k_use_atr=False):
-    # reset to 0 before trading
-    df['buy'] = 0 # (df.M4.shift(1) < 0) & (df.M4 > 0)
-    df['sell'] = 0 # (df.M4.shift(1) > 0) & (df.M4 < 0)
-    df['price'] = df.close
-    df['pos'] = 0
     # main logical
     data = df.values
     columns = df.columns.to_list()
     m4 = columns.index('M4')
     m5 = columns.index('M5')
-    buy = columns.index('buy')
-    sell = columns.index('sell')
     high = columns.index('high')
     low = columns.index('low')
-    price = columns.index('price')
-    open_ = columns.index('open')
     close = columns.index('close')
-    pos = columns.index('pos')
-
     price_t = close
+
+    trans = []
     # k, s1, s2 = 0.08, 10e-2, 1e-2
-    mp, enpp, sss, ppp = 0, 0, 0, 0
+    mp, enpp, entt, sss, ppp = 0, 0, 0, 0, 0
     last_1_m4, last_2_m4, last_3_m4, last_4_m4 = 0, 0, 0, 0
     for i in range(1, df.shape[0]):
         row = data[i]
         # loss
         if mp > 0 and row[low] <= sss:
-            row[sell] = mp
-            row[price] = sss
+            trans.append([mp, enpp, sss])
             mp = 0
         if mp < 0 and row[high] >= sss:
-            row[buy] = mp
-            row[price] = sss
+            trans.append([mp, enpp, sss])
             mp = 0
         # profit
         if mp > 0 and row[high] >= ppp:
-            row[sell] = mp
-            row[price] = ppp
+            trans.append([mp, enpp, ppp])
             mp = 0
         if mp < 0 and row[low] <= ppp:
-            row[buy] = mp
-            row[price] = ppp
+            trans.append([mp, enpp, ppp])
             mp = 0
         if cond_len == 0:
             cond_l = True
@@ -70,6 +57,112 @@ def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, k_use_atr=False):
             # cond_l = cond_l and last_return > s3
             # cond_s = cond_s and last_return < -s3
             atr_range = row[m5] / row[close]
+            cond_l = cond_l and atr_range < s3
+            cond_s = cond_s and atr_range < s3
+        # sell
+        if mp >= 0 and cond_s:
+            if mp != 0:
+                trans.append([mp, enpp, row[price_t]])
+            enpp = row[price_t]
+            if use_atr:
+                ppp = enpp - s1 * row[m5]
+                sss = enpp + s2 * row[m5]
+            else:
+                ppp = enpp * (1 - s1)
+                sss = enpp * (1 + s2)
+            mp = -1 
+        # buy
+        if mp <= 0 and cond_l:
+            if mp != 0:
+                trans.append([mp, enpp, row[price_t]])
+            enpp = row[price_t]
+            if use_atr:
+                ppp = enpp + s1 * row[m5]
+                sss = enpp - s2 * row[m5]
+            else:
+                ppp = enpp * (1 + s1)
+                sss = enpp * (1 - s2)
+            mp = 1
+        last_4_m4 = last_3_m4
+        last_3_m4 = last_2_m4
+        last_2_m4 = last_1_m4
+        last_1_m4 = row[m4]
+    return trans
+
+
+def search2(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, k_use_atr=False):
+    # reset to 0 before trading
+    df['buy'] = 0 # (df.M4.shift(1) < 0) & (df.M4 > 0)
+    df['sell'] = 0 # (df.M4.shift(1) > 0) & (df.M4 < 0)
+    df['price'] = df.close
+    df['pos'] = 0
+    df['status'] = 'init'
+    # main logical
+    data = df.values
+    columns = df.columns.to_list()
+    m4 = columns.index('M4')
+    m5 = columns.index('M5')
+    st = columns.index('status')
+    buy = columns.index('buy')
+    sell = columns.index('sell')
+    high = columns.index('high')
+    low = columns.index('low')
+    price = columns.index('price')
+    open_ = columns.index('open')
+    close = columns.index('close')
+    pos = columns.index('pos')
+
+    price_t = close
+    # k, s1, s2 = 0.08, 10e-2, 1e-2
+    mp, enpp, sss, ppp = 0, 0, 0, 0
+    last_1_m4, last_2_m4, last_3_m4, last_4_m4 = 0, 0, 0, 0
+    for i in range(1, df.shape[0]):
+        row = data[i]
+        # # loss
+        # if mp > 0 and row[low] <= sss:
+        #     row[sell] = mp
+        #     row[price] = sss
+        #     mp = 0
+        # if mp < 0 and row[high] >= sss:
+        #     row[buy] = mp
+        #     row[price] = sss
+        #     mp = 0
+        # profit
+        if mp > 0 and row[high] >= ppp:
+            row[sell] = mp
+            row[price] = row[price_t]
+            row[st] = 'l-win' 
+            mp = 0
+        if mp < 0 and row[low] <= ppp:
+            row[buy] = mp
+            row[price] = row[price_t]
+            row[st] = 's-win'
+            mp = 0
+        if cond_len == 0:
+            cond_l = True
+            cond_s = True
+        elif cond_len == 1:
+            cond_l = last_1_m4 < 0
+            cond_s = last_1_m4 > 0
+        elif cond_len == 2:
+            cond_l = (last_1_m4 < 0 and last_2_m4 < 0)
+            cond_s = (last_1_m4 > 0 and last_2_m4 > 0)
+        elif cond_len == 3:
+            cond_l = (last_1_m4 < 0 and last_2_m4 < 0 and last_3_m4 < 0)
+            cond_s = (last_1_m4 > 0 and last_2_m4 > 0 and last_3_m4 > 0)
+        elif cond_len == 4:
+            cond_l = (last_1_m4 < 0 and last_2_m4 < 0 and last_3_m4 < 0 and last_4_m4 < 0)
+            cond_s = (last_1_m4 > 0 and last_2_m4 > 0 and last_3_m4 > 0 and last_4_m4 > 0)
+        else:
+            raise ValueError(f'invalid {cond_len=}')
+        threshold = k * row[m5] / row[price_t] if k_use_atr else k
+        cond_l, cond_s = cond_s and (row[m4] > threshold), cond_l and (row[m4] < -threshold)
+        if s3 is not None:
+            # last_return = row[close] / row[open_] - 1.0
+            # cond_l = cond_l and last_return > s3
+            # cond_s = cond_s and last_return < -s3
+            # atr_range = row[m5] / row[close]
+            atr_range = (row[high] - row[low]) / row[m5]
             cond_l = cond_l and atr_range > s3
             cond_s = cond_s and atr_range > s3
         # sell
@@ -84,7 +177,7 @@ def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, k_use_atr=False):
                 sss = enpp * (1 + s2)
             row[price] = enpp
             mp = -1
-        
+            row[st] = 's-open'
         # buy
         if cond_l:
             row[buy] = 1 - mp
@@ -97,6 +190,7 @@ def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, k_use_atr=False):
                 sss = enpp * (1 - s2)
             row[price] = enpp
             mp = 1
+            row[st] = 'l-open'
         last_4_m4 = last_3_m4
         last_3_m4 = last_2_m4
         last_2_m4 = last_1_m4

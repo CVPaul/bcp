@@ -12,7 +12,7 @@ import pandas as pd
 
 from email.header import Header
 from email.mime.text import MIMEText
-from websocket import WebSocketConnectionClosedException
+from binance.constant import ROUND_AT, LOT_ROUND_AT
 
 
 def on_open(self):
@@ -167,3 +167,15 @@ def calc_vol(usd, price, minmove):
 
 def round_it(value, precision):
     return f"{value:.{precision}f}"
+
+
+def sym2coin(symbol):
+    return symbol.upper().split('USD')[0]
+
+
+def round_at(symbol):
+    return ROUND_AT[sym2coin(symbol)]
+
+
+def lot_round_at(symbol):
+    return LOT_ROUND_AT[sym2coin(symbol)]
