@@ -120,8 +120,9 @@ def main(args):
         cancel_all(args, cli, position) # cancel all before new open
         logging.info(f"ORDER|{order}")
         res = cli.new_order(**order)
+        qty = float(order['quantity'])
         trade_info = {
-            'pos':args.vol if order['side'] == 'BUY' else -args.vol,
+            'pos':qty if order['side'] == 'BUY' else -qty,
             'enpp': enpp, 'eOrderId': res['orderId']
         }
         order['quantity'] = args.vol
