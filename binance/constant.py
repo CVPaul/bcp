@@ -28,7 +28,6 @@ ROUND_AT = {
     "ETH": 2,
     "SUI": 4,
     "TRUMP": 3,
-    "1000PEPE": 7,
 }
 
 LOT_ROUND_AT = {
@@ -39,7 +38,6 @@ LOT_ROUND_AT = {
     'SOL': 2,
     'SUI': 1,
     'TRUMP': 2,
-    '1000PEPE': 1,
 }
 # Period
 N_MS_PER_SEC = 1000
