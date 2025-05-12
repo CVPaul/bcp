@@ -35,11 +35,10 @@ from tools.feishu.sender import send_exception
 def main(args):
     # args infer
     assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
+    api_key, private_key = load_api_keys(args.account)
     if args.is_um:
-        api_key, private_key = load_api_keys('zhou')
         cli = USDM(api_key=api_key, private_key=private_key)
     else:
-        api_key, private_key = load_api_keys('li')
         cli = CoinM(api_key=api_key, private_key=private_key)
     logging.basicConfig(
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
@@ -84,7 +83,7 @@ def main(args):
     gdf['DIF'] = gdf.close.rolling(args.his_window).mean().diff()
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     if args.debug:
-        gdf = gdf[['start_t','open', 'high', 'low', 'close', 'ATR', 'DIF', 'SIG']]
+        gdf = gdf[['start_t', 'open', 'high', 'low', 'close', 'ATR', 'DIF', 'SIG']]
         buy =  gdf.SIG > args.k
         sell = gdf.SIG < -args.k
         for i in range(args.cond_len):
@@ -92,8 +91,8 @@ def main(args):
             sell = sell & (gdf.SIG.shift(i + 1) > 0)
         gdf['side'] = buy.astype(int) - sell
         gdf['start_t'] = pd.to_datetime(gdf['start_t'], unit='ms') + td(hours=8)
-        gdf['start_t'] = gdf.start_t.dt.strftime('%d/%H')
-        print(gdf.dropna()[['start_t', 'close', 'ATR', 'DIF', 'SIG', 'side']])
+        gdf['day/h'] = gdf.start_t.dt.strftime('%d/%H')
+        print(gdf.dropna()[['day/h', 'close', 'ATR', 'DIF', 'SIG', 'side']].set_index('day/h'))
         return
     # trade
     maxlen = max(7, args.cond_len + 1)
@@ -193,7 +192,8 @@ if __name__ == "__main__":
         parser.add_argument('--use-atr', action='store_true')
         parser.add_argument('--usd', '-u', type=float, default=100)
         parser.add_argument('--vol', '-v', type=float, default=1)
-        parser.add_argument('--profit', '-p', type=float, default=5e-4)
+        parser.add_argument('--profit', '-p', type=float, default=1e-4)
+        parser.add_argument('--account', '-a', type=str, default='zhou')
         parser.add_argument('--stgname', type=str, default='backtest')
         args = parser.parse_args()
         args.is_um = not args.symbol.endswith('_PERP')
