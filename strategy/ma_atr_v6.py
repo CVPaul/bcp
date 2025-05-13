@@ -208,12 +208,15 @@ if __name__ == "__main__":
         parser.add_argument('--trade-side', '-ts', type=str, choices=['BUY', 'SELL'])
         parser.add_argument('--stgname', type=str, default='backtest')
         args = parser.parse_args()
+        if not args.use_atr:
+            assert args.s1 < 1 and args.s2 < 1, f'{args.s1=} and {args.s2=} is reqired to less than 1.0 without atr use'
         args.is_um = not args.symbol.endswith('_PERP')
         if args.trade_price > 1e-8:
             assert args.trade_side, f'--trade-side is require(`BUY` or `SELL`) when trade_price > 0'
         main(args)
     except Exception as e:
-        if hasattr(e, 'error_code') and e.error_code == -1021: # 已经止损失·
-            logging.warning(f"{args.stgname} is timeout")
-        else:
-            send_exception(args.symbol)
+        send_exception(args.symbol)
+        # if hasattr(e, 'error_code') and e.error_code == -1021: # 已经止损失·
+        #     logging.warning(f"{args.stgname} is timeout")
+        # else:
+        #     send_exception(args.symbol)
