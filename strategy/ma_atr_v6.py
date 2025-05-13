@@ -52,7 +52,7 @@ def main(args):
                 args.symbol, f"update pos after closed({status=})", str(pm.load()))
         pos = float(position['pos'])
         # is trading time
-        if dt.now().minute != 0:
+        if args.trade_price <= 1e-8 and dt.now().minute != 0:
             pm.save(position)
             return
     # init
@@ -113,13 +113,21 @@ def main(args):
         order["price"] = round_it(enpp * (1 - args.profit), round_at(args.symbol))
     else:
         logging.info(f"POSITION|{pos}")
+    if args.trade_price > 1e-8:
+        order["side"] = args.trade_side
+        order["quantity"] = args.vol
+        order["price"] = args.trade_price
+        enpp = order['price']
     if order['quantity'] > 1e-8:
         if args.is_um:
             order['quantity'] = round_it(
                 order['quantity'], lot_round_at(args.symbol))
-        cancel_all(args, cli, position) # cancel all before new open
-        logging.info(f"ORDER|{order}")
-        res = cli.new_order(**order)
+        if args.trade_price <= 1e-8:
+            cancel_all(args, cli, position) # cancel all before new open
+            logging.info(f"ORDER|{order}")
+            res = cli.new_order(**order)
+        else:
+            res ={'orderId': position.get('eOrderId', 0)}
         qty = float(order['quantity'])
         trade_info = {
             'pos':qty if order['side'] == 'BUY' else -qty,
@@ -158,6 +166,7 @@ def main(args):
                 sprice = enpp - args.s2 * atr
             else:
                 sprice = enpp * (1 - args.s2)
+            print(enpp, args.s2, atr, sprice)
             order['price'] = round_it(sprice, round_at(args.symbol))
             order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
         else:
@@ -195,9 +204,13 @@ if __name__ == "__main__":
         parser.add_argument('--vol', '-v', type=float, default=1)
         parser.add_argument('--profit', '-p', type=float, default=1e-4)
         parser.add_argument('--account', '-a', type=str, default='zhou')
+        parser.add_argument('--trade-price', '-tp', type=float, default=0)
+        parser.add_argument('--trade-side', '-ts', type=str, choices=['BUY', 'SELL'])
         parser.add_argument('--stgname', type=str, default='backtest')
         args = parser.parse_args()
         args.is_um = not args.symbol.endswith('_PERP')
+        if args.trade_price > 1e-8:
+            assert args.trade_side, f'--trade-side is require(`BUY` or `SELL`) when trade_price > 0'
         main(args)
     except Exception as e:
         if hasattr(e, 'error_code') and e.error_code == -1021: # 已经止损失·
