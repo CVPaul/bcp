@@ -43,16 +43,22 @@ def main(args):
     logging.basicConfig(
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+    need_step, step_price = 0, 0
     if not args.debug:
         # get trade-info
         pm = PositionManager(args.stgname)
-        position, status = upated_after_closed(args, cli, pm.load())
+        position = pd.load()
+        need_step = -1 if float(position['pos']) > 0 else 1 # reverse
+        position, status = upated_after_closed(args, cli, position)
         if status != 0:
             send_message(
                 args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
+        if status != 1: # take profit
+            need_step = 0
+            step_price = position['pprice']
         pos = float(position['pos'])
         # is trading time
-        if args.trade_price <= 1e-8 and dt.now().minute != 0:
+        if not need_step and args.trade_price <= 1e-8 and dt.now().minute != 0:
             pm.save(position)
             return
     # init
@@ -98,21 +104,33 @@ def main(args):
     maxlen = max(7, args.cond_len + 1)
     sigs = gdf.SIG.values[-maxlen:]
     order = {"symbol":args.symbol, "quantity": 0, "type": "LIMIT", "timeInForce": "GTC"}
-    cond_l = sigs[-1] > args.k
-    cond_s = sigs[-1] < -args.k
+    go_up = go_down = True
     for i in range(args.cond_len):
-        cond_l = cond_l and (sigs[-2 - i] < 0)
-        cond_s = cond_s and (sigs[-2 - i] > 0)
+        go_up = go_up and (sigs[-2 - i] > 0)
+        go_down = go_down and (sigs[-2 - i] < 0)
+    final_up = sigs[-1] > args.k
+    final_down = sigs[-1] < -args.k
+    if args.follow_trend:
+        cond_l = go_up and final_up
+        cond_s = go_down and final_down
+    else:
+        cond_l = go_down and final_up
+        cond_s = go_up and final_down
     if pos >= 0 and cond_s:
         order["side"] = "SELL"
-        order['quantity'] = args.vol + pos
+        order['quantity'] = pos if args.close_only else args.vol + pos
         order["price"] = round_it(enpp * (1 + args.profit), round_at(args.symbol))
     elif pos <= 0 and cond_l:
         order["side"] = "BUY"
-        order['quantity'] = args.vol - pos
+        order['quantity'] = -pos if args.close_only else args.vol - pos
         order["price"] = round_it(enpp * (1 - args.profit), round_at(args.symbol))
     else:
         logging.info(f"POSITION|{pos}")
+    if need_step != 0:
+        order["side"] = 'BUY' if need_step > 0 else 'SELL'
+        order["quantity"] = args.vol
+        order["price"] = step_price 
+        enpp = order['price']
     if args.trade_price > 1e-8:
         order["side"] = args.trade_side
         order["quantity"] = args.vol
@@ -122,25 +140,31 @@ def main(args):
         if args.is_um:
             order['quantity'] = round_it(
                 order['quantity'], lot_round_at(args.symbol))
-        if args.trade_price <= 1e-8:
+        if args.trade_price <= 1e-8 and need_step == 0:
             cancel_all(args, cli, position) # cancel all before new open
             logging.info(f"ORDER|{order}")
             res = cli.new_order(**order)
         else:
             res ={'orderId': position.get('eOrderId', 0)}
+        order['quantity'] = args.vol
+        if args.is_um:
+            order['quantity'] = round_it(
+                args.vol, lot_round_at(args.symbol))
         qty = float(order['quantity'])
         trade_info = {
             'pos':qty if order['side'] == 'BUY' else -qty,
             'enpp': enpp, 'eOrderId': res['orderId']
         }
-        order['quantity'] = args.vol
-        if args.is_um:
-            order['quantity'] = round_it(
-                args.vol, lot_round_at(args.symbol))
+        if args.close_only:
+            trade_info['pos'] = 0
+            pm.save(trade_info)
+            return # no stop/limit order needed
         atr = gdf.ATR.values[-1]
-        title = f"{args.account}::{args.stgname} {order['side']}@{order['price']}|{atr=:.6f}"
+        title = f"{args.stgname} {order['side']}@{order['price']}|{atr=:.6f}|acc={args.account}"
         # ----------------------------------------------------------------------------
         order['type'] = 'LIMIT' # 止盈单
+        if need_step == 0: # 2x vol
+            order['quantity'] = 
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
             if args.use_atr:
@@ -200,6 +224,7 @@ if __name__ == "__main__":
         parser.add_argument('--mp', type=int, default=0)
         parser.add_argument('--debug', action='store_true')
         parser.add_argument('--use-atr', action='store_true')
+        parser.add_argument('--close-only', action='store_true')
         parser.add_argument('--follow-trend', action='store_true')
         parser.add_argument('--usd', '-u', type=float, default=100)
         parser.add_argument('--vol', '-v', type=float, default=1)

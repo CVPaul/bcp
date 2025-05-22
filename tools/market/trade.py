@@ -39,18 +39,14 @@ def get_lot_size(exchange_info):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str)
-    parser.add_argument(
-        '--type', '-t', choices=['um', 'cm'], type=str, default='cm')
+    parser.add_argument('--account', '-a', type=str, default='zhou')
     args = parser.parse_args()
-
-    if args.type == 'cm':
-        api_key, private_key = load_api_keys('li')
-        client = CoinM(api_key=api_key, private_key=private_key)
-        args.symbol = f"{args.symbol.upper()}USD_PERP"
-    else:
-        api_key, private_key = load_api_keys('zhou')
-        client = USDM(api_key=api_key, private_key=private_key)
-        args.symbol = f"{args.symbol.upper()}USDT"
+    # api_key, private_key = load_api_keys('li')
+    # client = CoinM(api_key=api_key, private_key=private_key)
+    # args.symbol = f"{args.symbol.upper()}USD_PERP"
+    api_key, private_key = load_api_keys(args.account)
+    client = USDM(api_key=api_key, private_key=private_key)
+    args.symbol = f"{args.symbol.upper()}USDC"
     cutline_len = 145
     # qty = 4.6012345
     # order = {
@@ -60,7 +56,8 @@ if __name__ == "__main__":
     #     "timeInForce": "GTC", "price": '12.791',
     # }
     # res = client.new_order(**order)
-    # res = client.get_order(args.symbol, orderId=69332236674)
-    res = client.exchange_info()
-    print(get_lot_size(res))
+    res = client.get_orders(args.symbol) #, orderId=69332236674)
+    # res = client.exchange_info()
+    # print(get_lot_size(res))
+    print(pd.DataFrame(res).T)
     print("=" * cutline_len)
