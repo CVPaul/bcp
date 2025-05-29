@@ -80,10 +80,10 @@ def main(args):
     if args.is_um:
         args.vol = args.usd / enpp
     gdf['ATR'] = ATR(args.atr_window, gdf).calc(gdf)
-    gdf['DIF'] = gdf.close.rolling(args.his_window).mean().diff()
+    gdf['MA7'] = gdf.close.rolling(args.his_window).mean()
+    gdf['DIF'] = gdf.MA7.diff()
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     if args.debug:
-        gdf = gdf[['start_t', 'open', 'high', 'low', 'close', 'ATR', 'DIF', 'SIG']]
         buy =  gdf.SIG > args.k
         sell = gdf.SIG < -args.k
         for i in range(args.cond_len):
