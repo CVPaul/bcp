@@ -65,7 +65,7 @@ def main(args):
             gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 50)
             if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
                 break
-            if i > 2:
+            if i > 7:
                 send_message(
                     args.symbol, f"{args.stgname}'s marketinfo delay",
                     f"count:{i},close-price:{gdf[-1][4]}", )
