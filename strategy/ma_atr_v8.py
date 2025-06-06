@@ -43,39 +43,34 @@ def main(args):
     logging.basicConfig(
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
-    need_step, step_price = 0, 0
     if not args.debug:
         # get trade-info
         pm = PositionManager(args.stgname)
-        position = pd.load()
-        need_step = -1 if float(position['pos']) > 0 else 1 # reverse
-        position, status = upated_after_closed(args, cli, position)
+        position, status = upated_after_closed(args, cli, pm.load())
         if status != 0:
             send_message(
                 args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
-        if status != 1: # take profit
-            need_step = 0
-            step_price = position['pprice']
         pos = float(position['pos'])
         # is trading time
-        if not need_step and args.trade_price <= 1e-8 and dt.now().minute != 0:
+        if args.trade_price <= 1e-8 and dt.now().minute % args.period != 0:
             pm.save(position)
             return
     # init
     target_time = int(time.time())
-    target_time = (target_time - (target_time %  3600)) * 1000
+    target_time_h = (target_time - (target_time % 3600)) * 1000
+    target_time = (target_time - (target_time %  (args.period * 60))) * 1000
     if args.debug:
-        gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 50)
+        gdf = cli.klines(args.symbol, f"{args.period}m", limit = args.his_window + 50)
     else:
         for i in range(10):
-            gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 50)
+            gdf = cli.klines(args.symbol, f"{args.period}m", limit = args.his_window + 50)
             if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
                 break
-            if i > 2:
-                send_message(
-                    args.symbol, f"{args.stgname}'s marketinfo delay",
-                    f"count:{i},close-price:{gdf[-1][4]}", )
             time.sleep(1)
+        if gdf[-1][0] < target_time: # 服务器端出现延迟的时候需要重新拉取
+            send_message(
+                args.symbol, f"{args.stgname}'s 5m marketinfo delay",
+                f"count:{i},close-price:{gdf[-1][4]}", )
     gdf = pd.DataFrame(
         gdf[:-1], columns=[ # drop the last gdf[-1]
             'start_t', 'open', 'high', 'low', 'close',
@@ -85,11 +80,29 @@ def main(args):
     enpp = gdf.close.iloc[-1]
     if args.is_um:
         args.vol = args.usd / enpp
-    gdf['ATR'] = ATR(args.atr_window, gdf).calc(gdf)
-    gdf['DIF'] = gdf.close.rolling(args.his_window).mean().diff()
+    for i in range(10):
+        hdf = cli.klines(args.symbol, "1h", limit=args.atr_window + 1)
+        if hdf[-1][0] >= target_time_h: # 服务器端出现延迟的时候需要重新拉取
+            break
+        time.sleep(1)
+    if hdf[-1][0] < target_time_h: # 服务器端出现延迟的时候需要重新拉取
+        send_message(
+            args.symbol, f"{args.stgname}'s 1h marketinfo delay",
+            f"count:{i},close-price:{gdf[-1][4]}", )
+    assert hdf[-1][0] >= target_time_h # 服务器端出现延迟的时候需要重新拉取
+    if args.debug:
+        print(f">>>[ATR-TIME]:", pd.to_datetime(hdf[-1][0], unit='ms'))
+    hdf = pd.DataFrame(
+        hdf[:-1], columns=[ # drop the last df[-1]
+            'start_t', 'open', 'high', 'low', 'close',
+            'volume', 'end_t', 'amount', 'trade_cnt',
+            'taker_vol', 'taker_amt', 'reserved'
+        ]).astype(float)
+    gdf['ATR'] = ATR(args.atr_window).calc(hdf).values[-1] # trick只取最新的一个，无需对齐(join) 
+    gdf['MA7'] = gdf.close.rolling(args.his_window).mean()
+    gdf['DIF'] = gdf.MA7.diff()
     gdf['SIG'] = gdf['DIF'] / gdf['ATR']
     if args.debug:
-        gdf = gdf[['start_t', 'open', 'high', 'low', 'close', 'ATR', 'DIF', 'SIG']]
         buy =  gdf.SIG > args.k
         sell = gdf.SIG < -args.k
         for i in range(args.cond_len):
@@ -97,8 +110,8 @@ def main(args):
             sell = sell & (gdf.SIG.shift(i + 1) > 0)
         gdf['side'] = buy.astype(int) - sell
         gdf['start_t'] = pd.to_datetime(gdf['start_t'], unit='ms') + td(hours=8)
-        gdf['day/h'] = gdf.start_t.dt.strftime('%d/%H')
-        print(gdf.dropna()[['day/h', 'close', 'ATR', 'DIF', 'SIG', 'side']].set_index('day/h'))
+        gdf['day/time'] = gdf.start_t.dt.strftime('%d/%H:%M')
+        print(gdf.dropna()[['day/time', 'close', 'ATR', 'DIF', 'SIG', 'side']].set_index('day/time'))
         return
     # trade
     maxlen = max(7, args.cond_len + 1)
@@ -116,6 +129,7 @@ def main(args):
     else:
         cond_l = go_down and final_up
         cond_s = go_up and final_down
+    # cond_l, cond_s = cond_s, cond_l
     if pos >= 0 and cond_s:
         order["side"] = "SELL"
         order['quantity'] = pos if args.close_only else args.vol + pos
@@ -126,11 +140,6 @@ def main(args):
         order["price"] = round_it(enpp * (1 - args.profit), round_at(args.symbol))
     else:
         logging.info(f"POSITION|{pos}")
-    if need_step != 0:
-        order["side"] = 'BUY' if need_step > 0 else 'SELL'
-        order["quantity"] = args.vol
-        order["price"] = step_price 
-        enpp = order['price']
     if args.trade_price > 1e-8:
         order["side"] = args.trade_side
         order["quantity"] = args.vol
@@ -140,7 +149,7 @@ def main(args):
         if args.is_um:
             order['quantity'] = round_it(
                 order['quantity'], lot_round_at(args.symbol))
-        if args.trade_price <= 1e-8 and need_step == 0:
+        if args.trade_price <= 1e-8:
             cancel_all(args, cli, position) # cancel all before new open
             logging.info(f"ORDER|{order}")
             res = cli.new_order(**order)
@@ -163,8 +172,6 @@ def main(args):
         title = f"{args.stgname} {order['side']}@{order['price']}|{atr=:.6f}|acc={args.account}"
         # ----------------------------------------------------------------------------
         order['type'] = 'LIMIT' # 止盈单
-        if need_step == 0: # 2x vol
-            order['quantity'] = 
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
             if args.use_atr:
@@ -204,7 +211,8 @@ def main(args):
         res = cli.new_order(**order)
         trade_info['sprice'] = order['price']
         trade_info['sOrderId'] = res['orderId']
-        send_message(args.symbol, title, str(trade_info))
+        if not args.quiet:
+            send_message(args.symbol, title, str(trade_info))
         # ----------------------------------------------------------------------------
         pm.save(trade_info)
     elif order['quantity'] < 0:
@@ -230,9 +238,11 @@ if __name__ == "__main__":
         parser.add_argument('--vol', '-v', type=float, default=1)
         parser.add_argument('--profit', '-p', type=float, default=1e-4)
         parser.add_argument('--account', '-a', type=str, default='zhou')
+        parser.add_argument('--period', type=int, default=5)
         parser.add_argument('--trade-price', '-tp', type=float, default=0)
         parser.add_argument('--trade-side', '-ts', type=str, choices=['BUY', 'SELL'])
         parser.add_argument('--stgname', type=str, default='backtest')
+        parser.add_argument('--quiet', action='store_true')
         args = parser.parse_args()
         if not args.use_atr:
             assert args.s1 < 1 and args.s2 < 1, f'{args.s1=} and {args.s2=} is reqired to less than 1.0 without atr use'
@@ -245,4 +255,7 @@ if __name__ == "__main__":
         if dt.now().minute != 0 and hasattr(e, 'error_code') and e.error_code == -1021: # 已经止损失·
             logging.warning(f"{args.stgname} is timeout")
         else:
-            send_exception(args.symbol)
+            if args.debug:
+                raise e
+            else:
+                send_exception(args.symbol)
