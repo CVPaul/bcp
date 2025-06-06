@@ -97,7 +97,7 @@ def search0(df, k, s1, s2, s3=None, cond_len=2, use_atr=False):
     return pd.DataFrame(data, columns=columns), trans
 
 
-def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, follow_trend=False):
+def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, follow_trend=False, reverse=False):
     # main logical
     data = df.values
     columns = df.columns.to_list()
@@ -150,6 +150,8 @@ def search(df, k, s1, s2, s3=None, cond_len=2, use_atr=False, follow_trend=False
         else:
             cond_l = cond_l and (row[m4] > k)
             cond_s = cond_s and (row[m4] < -k)
+        if reverse:
+            cond_l, cond_s = cond_s, cond_l
         if s3 is not None:
             # last_return = row[close] / row[open_] - 1.0
             # cond_l = cond_l and last_return > s3
