@@ -1,1 +1,1 @@
-PYTHONPATH=. python tools/market/income.py -s $1 --account ${2:-zhou}
+PYTHONPATH=. python tools/market/income.py --account ${1:-zhou} -s ${2:-eth}
