@@ -23,15 +23,41 @@ from strategy.indicator.common import MA
 from strategy.indicator.common import ATR
 
 
+def get_asset(accinfo, usdx={'USDC':0.0, 'USDT':0.0}):
+    for asset in accinfo['assets']:
+        symbol = asset['asset']
+        if symbol in usdx:
+            usdx[symbol] += float(asset['walletBalance'])
+    total = 0.0
+    for _, amount in usdx.items():
+        total += amount
+    usdx['total'] = total
+    return pd.DataFrame([usdx])
+
+
+def get_positions(accinfo):
+    positions = pd.DataFrame(accinfo['positions'])[[
+        'symbol', "positionAmt", "notional", "updateTime"]]
+    positions.updateTime = pd.to_datetime(
+        positions.updateTime, unit='ms').dt.strftime(args.time_format)
+    positions.positionAmt = positions.positionAmt.astype(float)
+    positions.notional = positions.notional.astype(float)
+    positions = positions[positions.positionAmt != 0]
+    return positions
+
+
 if __name__ == "__main__":
+    mark, cutline_len = '-', 50
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str)
+    parser.add_argument('--account', '-a', type=str, default='zhou')
+    parser.add_argument('--time-format', '-tf', type=str, default='%d/%H:%M:%S')
     parser.add_argument(
-        '--type', '-t', type=str, choices=['cm', 'um'], default='cm')
+        '--type', '-t', type=str, choices=['cm', 'um'], default='um')
     args = parser.parse_args()
     # global
     if not args.symbol:
-        args.symbol = ['SOL', 'BNB', 'ETH']
+        args.symbol = ['ETH', 'BNB', 'DOGE']
     else:
         args.symbol = args.symbol.split(',') 
     if args.type == 'cm':
@@ -39,44 +65,40 @@ if __name__ == "__main__":
         cli = CoinM(api_key=api_key, private_key=private_key)
         args.symbol = [f'{x}USD_PERP' for x in args.symbol]
     else:
-        api_key, private_key = load_api_keys('zhou')
+        api_key, private_key = load_api_keys(args.account)
         cli = USDM(api_key=api_key, private_key=private_key)
-        args.symbol = [f'{x}USDT' for x in args.symbol]
-    cutline_len = 145
-    # 校准服务器时间和本地时间
-    target_time = int(time.time())
-    target_time = 1000 * (target_time - (target_time % (60 * 60)))
-    for i in range(5):
-        gdf = cli.klines(
-            args.symbol, "1h",
-            limit = (10 + 50))
-        if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
-            print(gdf[-1][0], target_time)
-            break
-        print(
-            args.symbol, f"test's marketinfo delay",
-            f"count:{i}\ntarget_time:{target_time}\nsever_time:{gdf[-1][0]}")
-        time.sleep(1)
-    print("=" * cutline_len)
-    print(f"market info board:")
-    positions = {}
-    for pos in cli.account()['positions']:
-        if pos['symbol'] in args.symbol:
-            positions[pos['symbol']] = int(pos['positionAmt'])
+        args.symbol = [f'{x}USDC' for x in args.symbol]
+    accstr = f"Account:{args.account}"
+    headlen = (cutline_len - len(accstr)) // 2 - 1
+    print(mark * headlen, accstr, mark * headlen)
+    accinfo = cli.account()
+    print(f"Asset info:")
+    print(get_asset(accinfo))
+    print(mark * cutline_len)
+    print(f"Positions info:")
+    print(get_positions(accinfo))
+    print(mark * cutline_len)
+    orders = []
     for symbol in args.symbol:
-        if symbol not in positions:
-            positions[symbol] = 0
+        orders.extend(cli.get_open_orders(symbol))
+    if orders:
+        orders = pd.DataFrame(orders)[[
+            'symbol', 'price', 'origQty', 'side', 'updateTime']]
+        orders.updateTime = pd.to_datetime(
+            orders.updateTime, unit='ms').dt.strftime(args.time_format)
+        print(f"Orders info {args.account}:")
+        print(orders)
+    else:
+        print("No open orders.")
+    print(mark * cutline_len)
+    print(f"Market info:")
+    mds = []
     for symbol in args.symbol:
         rsp = cli.ticker_price(symbol)
         if isinstance(rsp, list):
             rsp = rsp[0]
-        print(f"    market info of {symbol}:")
-        for key, value in rsp.items():
-            print(f"        - {key}: {value}")
-        print(f"        - position: {positions[symbol]}")
-        for order in cli.get_open_orders(symbol):
-            print("*" * (cutline_len // 2))
-            for key in ['orderId', 'price', 'origQty']:
-                print(f"*       - {key}: {order[key]}")
-            print("*" * (cutline_len // 2))
-    print("=" * cutline_len)
+        mds.append(rsp)
+    mds = pd.DataFrame(mds)
+    mds.time = pd.to_datetime(mds.time, unit='ms')
+    print(mds)
+    print(mark * cutline_len)
