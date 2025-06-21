@@ -1,0 +1,2 @@
+cd ~/bcp
+PYTHONPATH=. python tools/market/info.py -a ${1:-zhou}

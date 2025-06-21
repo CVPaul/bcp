@@ -1,0 +1,6 @@
+if [ $# -lt 1 ]; then
+	echo ">>> which coin data dou what to downloads with UDSC and um, e.g sh $1 eth"
+	exit 1
+fi
+
+PYTHONPATH=. python tools/data/download.py -s $1 -t um -u USDC

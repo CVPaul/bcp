@@ -89,10 +89,10 @@ def main(args):
         for i in range(args.cond_len):
             buy = buy & (gdf.SIG.shift(i + 1) < 0)
             sell = sell & (gdf.SIG.shift(i + 1) > 0)
-        gdf['side'] = buy.astype(int) - sell
+        gdf['D'] = buy.astype(int) - sell
         gdf['start_t'] = pd.to_datetime(gdf['start_t'], unit='ms') + td(hours=8)
         gdf['day/h'] = gdf.start_t.dt.strftime('%d/%H')
-        print(gdf.dropna()[['day/h', 'close', 'ATR', 'DIF', 'SIG', 'side']].set_index('day/h'))
+        print(gdf.dropna()[['day/h', 'close', 'ATR', 'DIF', 'SIG', 'D']].set_index('day/h'))
         return
     # trade
     maxlen = max(7, args.cond_len + 1)

@@ -53,5 +53,4 @@ if __name__ == "__main__":
     API_KEY, PRIVATE_KEY = load_api_keys(args.account)
     orders = pd.DataFrame(get_order_history(args.symbol, args.start_time, args.end_time))
     orders.time = pd.to_datetime(orders.time, unit='ms')
-
-    print(orders.tail(20), "\n>>> total pnl:", orders.income.astype(float).sum())
+    print(orders[['time', 'income']].tail(20), "\n>>> total pnl:", orders.income.astype(float).sum())
