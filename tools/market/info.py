@@ -46,7 +46,10 @@ def get_asset(accinfo, usdx={'USDC':0.0, 'USDT':0.0}):
 
 def get_positions(accinfo, mds):
     price_map = mds[['symbol', 'price']].set_index('symbol').astype(float).to_dict()['price']
-    positions = pd.DataFrame(accinfo['positions'])[[
+    positions = pd.DataFrame(accinfo['positions'])
+    if positions.empty:
+        return "No position data!"
+    positions = positions[[
         'symbol', "positionAmt", "unrealizedProfit", "updateTime"]].rename(
         columns={
             'unrealizedProfit': 'pnl', 'positionAmt': 'pos'})

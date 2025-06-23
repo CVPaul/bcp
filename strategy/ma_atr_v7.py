@@ -177,14 +177,20 @@ def main(args):
                 sprice = enpp - args.s2 * atr
             else:
                 sprice = enpp * (1 - args.s2)
-            order['price'] = round_it(sprice, round_at(args.symbol))
+            if order['type'] == 'STOP_MARKET' and 'price' in order:
+                order.pop('price')
+            else:
+                order['price'] = round_it(sprice, round_at(args.symbol))
             order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
         else:
             if args.use_atr:
                 sprice = enpp + args.s2 * atr
             else:
                 sprice = enpp * (1 + args.s2)
-            order['price'] = round_it(sprice, round_at(args.symbol))
+            if order['type'] == 'STOP_MARKET' and 'price' in order:
+                order.pop('price')
+            else:
+                order['price'] = round_it(sprice, round_at(args.symbol))
             order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
         logging.info(f"STOP|{order}")
         res = cli.new_order(**order)
