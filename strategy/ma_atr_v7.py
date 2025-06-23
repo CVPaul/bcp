@@ -171,22 +171,21 @@ def main(args):
         trade_info['pprice'] = order['price']
         trade_info['pOrderId'] = res['orderId']
         # ----------------------------------------------------------------------------
-        order['type'] = 'STOP' # 止损单
+        order['type'] = 'STOP_MARKET' # 止损单
         if order['side'] == 'SELL': # side已经在上面修改过了
             if args.use_atr:
                 sprice = enpp - args.s2 * atr
             else:
                 sprice = enpp * (1 - args.s2)
-            print(enpp, args.s2, atr, sprice)
             order['price'] = round_it(sprice, round_at(args.symbol))
-            order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
+            order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
         else:
             if args.use_atr:
                 sprice = enpp + args.s2 * atr
             else:
                 sprice = enpp * (1 + args.s2)
             order['price'] = round_it(sprice, round_at(args.symbol))
-            order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
+            order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
         logging.info(f"STOP|{order}")
         res = cli.new_order(**order)
         trade_info['sprice'] = order['price']

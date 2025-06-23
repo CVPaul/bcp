@@ -1,2 +1,2 @@
 cd ~/bcp
-PYTHONPATH=. python tools/market/income.py --account ${1:-zhou} -s ${2:-eth}
+PYTHONPATH=. python tools/market/income.py --account ${1:-li} -s ${2:-eth}
