@@ -214,7 +214,7 @@ def main(args):
             order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
         logging.info(f"STOP|{order}")
         res = cli.new_order(**order)
-        trade_info['sprice'] = order['price']
+        trade_info['sprice'] = order['stopPrice']
         trade_info['sOrderId'] = res['orderId']
         if not args.quiet:
             send_message(args.symbol, title, str(trade_info))
