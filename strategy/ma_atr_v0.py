@@ -138,7 +138,7 @@ def main(args):
         gdf.values, price, args.k, args.s1, args.s2, args.cond_len,
         args.use_atr, args.follow_trend, atr_idx, sig_idx)
     orders, trade_info = get_orders(
-        args, cli, pos, cond_l, cond_s, price, pprice, sprice) 
+        args, pos, cond_l, cond_s, price, pprice, sprice) 
     if orders: # new open
         # cancel_all(args.symbol, cli, position)
         # execute(args, cli, orders, trade_info)
