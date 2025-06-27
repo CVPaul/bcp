@@ -37,6 +37,11 @@ def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend, atr_idx, 
     else:
         cond_l = go_down and final_up
         cond_s = go_up and final_down
+    return cond_l, cond_s, *get_prices(cond_l, cond_s, price, s1, s2, use_atr, atr)
+
+
+@nb.jit(nopython=True, cache=True)
+def get_prices(cond_l, cond_s, price, s1, s2, use_atr, atr):
     pprice = sprice = 0
     if cond_l:
         if use_atr:
@@ -52,7 +57,7 @@ def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend, atr_idx, 
         else:
             pprice = price * (1 - s1)
             sprice = price * (1 + s2)
-    return cond_l, cond_s, pprice, sprice, atr
+    return pprice, sprice
 
 
 @nb.jit(nopython=True, cache=True)
@@ -64,7 +69,7 @@ def _v1_(data, k, s1, s2, cond_len, use_atr, follow_trend, close, high, low, atr
     for i in range(start_pos, data.shape[0]):
         row = data[i]
         price_t = row[close]
-        cond_l, cond_s, pprice, sprice, atr = get_signal(
+        cond_l, cond_s, pprice, sprice = get_signal(
             data[i - start_pos:i + 1], price_t, k, s1, s2, cond_len,
             use_atr, follow_trend, atr_idx, sig_idx)
         # loss

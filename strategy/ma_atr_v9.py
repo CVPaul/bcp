@@ -19,43 +19,12 @@ from binance.fut.coinm import CoinM
 from binance.auth.utils import load_api_keys
 from binance.tools.trade.position import PositionManager
 
-from strategy.common.utils import round_at, lot_round_at
-from strategy.common.utils import cancel_all, round_it
-from strategy.common.utils import upated_after_closed
+from strategy.common.utils import(
+    round_at, lot_round_at, round_it, cancel_all)
 from strategy.indicator.common import ATR
 from tools.feishu.sender import send_message
 from tools.feishu.sender import send_exception
-
-
-def main(args):
-    # args infer
-    assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
-    api_key, private_key = load_api_keys(args.account)
-    if args.is_um:
-        cli = USDM(api_key=api_key, private_key=private_key)
-    else:
-        cli = CoinM(api_key=api_key, private_key=private_key)
-    logging.basicConfig(
-        filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
-    if not args.debug:
-        # get trade-info
-        pm = PositionManager(args.stgname)
-        position, status = upated_after_closed(args, cli, pm.load())
-        if status != 0:
-            send_message(
-                args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
-        pos = float(position['pos'])
-        # is trading time
-        if args.trade_price <= 1e-8 and dt.now().minute != 0:
-            pm.save(position)
-            return
-    gdf = get_data(args, cli)
-    enpp = gdf.close.iloc[-1]
-    cond_l, cond_s, atr = get_signal(args, cli)
-    orders, trade_info = get_orders(
-        args, cli, atr, pos, cond_l, cond_s, enpp) 
-    execute(args, cli, orders, trade_info)
+from prototype.v3 import get_feat, get_signal, get_prices
 
 
 def get_data(args, cli):
@@ -63,7 +32,7 @@ def get_data(args, cli):
     target_time = int(time.time())
     target_time = (target_time - (target_time %  3600)) * 1000
     for i in range(10):
-        gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 50)
+        gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 10)
         if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
             break
         if i > 7:
@@ -79,31 +48,7 @@ def get_data(args, cli):
         ]).astype(float) 
 
 
-def get_signal(args, gdf):
-    # init
-    atr = ATR(args.atr_window, gdf).calc(gdf).iloc[-2] # atr shift 1
-    gdf['MA7'] = gdf.close.rolling(args.his_window).mean()
-    gdf['DIF'] = gdf.MA7.diff()
-    gdf['SIG'] = gdf['DIF'] / atr
-    # trade
-    maxlen = max(7, args.cond_len + 1)
-    sigs = gdf.SIG.values[-maxlen:]
-    go_up = go_down = True
-    for i in range(args.cond_len):
-        go_up = go_up and (sigs[-2 - i] > 0)
-        go_down = go_down and (sigs[-2 - i] < 0)
-    final_up = sigs[-1] > args.k
-    final_down = sigs[-1] < -args.k
-    if args.follow_trend:
-        cond_l = go_up and final_up
-        cond_s = go_down and final_down
-    else:
-        cond_l = go_down and final_up
-        cond_s = go_up and final_down
-    return cond_l, cond_s, atr
-
-
-def get_orders(args, atr, pos, cond_l, cond_s, enpp):
+def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
     orders = {}
     order = {"symbol":args.symbol, "quantity": 0, "type": "LIMIT", "timeInForce": "GTC"}
     if pos >= 0 and cond_s:
@@ -118,45 +63,30 @@ def get_orders(args, atr, pos, cond_l, cond_s, enpp):
         logging.info(f"POSITION|{pos}")
     if order['quantity'] > 1e-8:
         if args.is_um:
-            order['quantity'] = round_it(
-                order['quantity'], lot_round_at(args.symbol))
+            order['quantity'] = round_it(order['quantity'], lot_round_at(args.symbol))
         orders['eOrderId'] = copy.deepcopy(order)
-        qty = float(order['quantity'])
-        trade_info = {'pos':qty if order['side'] == 'BUY' else -qty, 'enpp': enpp}
+        trade_info = {'pos': args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
+        if args.is_um:
+            order['quantity'] = round_it(
+                args.vol + pos if pos > 1e-8 else args.vol, lot_round_at(args.symbol))
         order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
-            if args.use_atr:
-                pprice = enpp + args.s1 * atr
-            else:
-                pprice = enpp * (1 + args.s1)
             order['price'] = round_it(pprice, round_at(args.symbol))
         else:
             order['side'] = 'BUY'
-            if args.use_atr:
-                pprice = enpp - args.s1 * atr
-            else:
-                pprice = enpp * (1 - args.s1)
             order['price'] = round_it(pprice, round_at(args.symbol))
         orders['pOrderId'] = copy.deepcopy(order)
         trade_info['pprice'] = order['price']
         # ----------------------------------------------------------------------------
         order['type'] = 'STOP_MARKET' # 止损单
         if order['side'] == 'SELL': # side已经在上面修改过了
-            if args.use_atr:
-                sprice = enpp - args.s2 * atr
-            else:
-                sprice = enpp * (1 - args.s2)
             if order['type'] == 'STOP_MARKET' and 'price' in order:
                 order.pop('price')
             else:
                 order['price'] = round_it(sprice, round_at(args.symbol))
             order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
         else:
-            if args.use_atr:
-                sprice = enpp + args.s2 * atr
-            else:
-                sprice = enpp * (1 + args.s2)
             if order['type'] == 'STOP_MARKET' and 'price' in order:
                 order.pop('price')
             else:
@@ -167,13 +97,122 @@ def get_orders(args, atr, pos, cond_l, cond_s, enpp):
     return orders, trade_info
 
 
+def upated_after_closed(args, cli, position):
+    pOrderId = position.get('pOrderId', 0)
+    sOrderId = position.get('sOrderId', 0)
+    status = 0
+    if pOrderId:
+        filled = False
+        try:
+            res = cli.get_order(args.symbol, orderId=pOrderId)
+            filled = res['status'] == 'FILLED'
+        except Exception as e:
+            if e.error_code == -2013: # 已经止盈
+                filled = True
+            else:
+                raise e
+        if filled:
+            if sOrderId:
+                try:
+                    cli.cancel_order(args.symbol, orderId=sOrderId)
+                except:
+                    pass # 无论是否撤成功都行
+            sOrderId = 0
+            status = 1
+    if sOrderId: 
+        filled = False
+        try:
+            res = cli.get_order(args.symbol, orderId=sOrderId)
+            filled = res['status'] == 'FILLED'
+        except Exception as e:
+            if e.error_code == -2013: # 已经止损失·
+                filled = True
+            else:
+                raise e
+        if filled:
+            if pOrderId:
+                try:
+                    cli.cancel_order(args.symbol, orderId=pOrderId)
+                except:
+                    pass # 无论是否撤成功都行
+            pOrderId = 0
+            status = 2
+    return status
+
+
 def execute(args, cli, orders, trade_info):
     for key, order in orders.items():
         res = cli.order(**order)
         trade_info[key] = res['orderId']
     pm = PositionManager(args.stgname)
     pm.save(trade_info)
-    return res
+    return trade_info
+
+
+def main(args):
+    # args infer
+    assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
+    api_key, private_key = load_api_keys(args.account)
+    if args.is_um:
+        cli = USDM(api_key=api_key, private_key=private_key)
+    else:
+        cli = CoinM(api_key=api_key, private_key=private_key)
+    logging.basicConfig(
+        filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+    # get trade-info
+    pm = PositionManager(args.stgname)
+    position = pm.load()
+    status = upated_after_closed(args, cli, position)
+    pos = float(position['pos'])
+    if status == 0:
+        # is trading time
+        if dt.now().minute != 0:
+            pm.save(position)
+            return
+        # trade logic
+        gdf = get_data(args, cli)
+        gdf = get_feat(gdf, args.atr_window, args.his_window)
+        price = gdf.close.iloc[-1]
+        atr_idx = gdf.columns.get_loc('ATR')
+        sig_idx = gdf.columns.get_loc('SIG')
+        cond_l, cond_s, pprice, sprice = get_signal(
+            gdf.values, price, args.k, args.s1, args.s2, args.cond_len,
+            args.use_atr, args.follow_trend, atr_idx, sig_idx)
+        orders, trade_info = get_orders(
+            args, pos, cond_l, cond_s, price, pprice, sprice) 
+        if orders:
+            cancel_all(args.symbol, cli, position)
+    else:
+        send_message(
+            args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
+        gdf = get_data(args, cli)
+        atr = ATR(args.atr_window).calc(gdf).values[-1]
+        trade_info_update = {}
+        if status == 1:
+            trade_info_update['side'] = 'SELL'
+            trade_info_update['enpp'] = position['pprice']
+            trade_info_update['eOrderId'] = position['pOrderId']
+            cond_l, cond_s = False, True
+        elif status == 2:
+            trade_info_update['side'] = 'BUY'
+            trade_info_update['enpp'] = position['sprice']
+            trade_info_update['eOrderId'] = position['sOrderId']
+            cond_l, cond_s = True, False
+        else:
+            raise ValueError(f"Unknown status: {status}")
+        price = float(trade_info_update['enpp'])
+        pprice, sprice = get_prices(
+            cond_l, cond_s, price, args.s1, args.s2, args.use_atr, atr)
+        orders, trade_info = get_orders(
+            args, pos, cond_l, cond_s, price, pprice, sprice)
+        orders.pop('eOrderId', None) # 只需要止盈止损单
+        # update the trade info
+        trade_info.update(trade_info_update)
+    if orders: # new open
+        # execute(args, cli, orders, trade_info)
+        logging.info(f"{args.stgname} executed orders: {orders}")
+        logging.info(f"{args.stgname} trade_info: {trade_info}")
 
 
 if __name__ == "__main__":
