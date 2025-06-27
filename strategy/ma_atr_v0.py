@@ -64,11 +64,10 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
         logging.info(f"POSITION|{pos}")
     if order['quantity'] > 1e-8:
         if args.is_um:
-            order['quantity'] = round_it(
-                order['quantity'], lot_round_at(args.symbol))
+            order['quantity'] = round_it(order['quantity'], lot_round_at(args.symbol))
         orders['eOrderId'] = copy.deepcopy(order)
-        qty = float(order['quantity'])
-        trade_info = {'pos':qty if order['side'] == 'BUY' else -qty, 'enpp': enpp}
+        trade_info = {'pos':args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
+        order['quantity'] = round_it(args.vol, lot_round_at(args.symbol))
         order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
@@ -162,7 +161,7 @@ if __name__ == "__main__":
         parser.add_argument('--close-only', action='store_true')
         parser.add_argument('--follow-trend', action='store_true')
         parser.add_argument('--usd', '-u', type=float, default=100)
-        parser.add_argument('--vol', '-v', type=float, default=1)
+        parser.add_argument('--vol', '-v', type=float, default=0.01)
         parser.add_argument('--profit', '-p', type=float, default=1e-4)
         parser.add_argument('--account', '-a', type=str, default='zhou')
         parser.add_argument('--trade-price', '-tp', type=float, default=0)
