@@ -55,12 +55,12 @@ def get_positions(accinfo, mds):
             'unrealizedProfit': 'pnl', 'positionAmt': 'pos'})
     positions['pnl'] = positions.pnl.astype(float).round(2)
     positions['pos'] = positions.pos.astype(float)
+    positions = positions[positions.pos != 0]
     positions['price'] = positions.apply(
         lambda r: 
             round_it(price_map[r['symbol']] - r['pnl'] / r['pos'], round_at(r['symbol'])), axis=1)
     positions['updateTime'] = to_datetime(
         positions.pop('updateTime')).dt.strftime(args.time_format)
-    positions = positions[positions.pos != '0']
     return rename_symbol(positions)
 
 
