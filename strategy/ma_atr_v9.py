@@ -189,16 +189,20 @@ def main(args):
         gdf = get_data(args, cli)
         atr = ATR(args.atr_window).calc(gdf).values[-1]
         trade_info_update = {}
-        if status == 1:
+        if pos > 1e-8:
+            cond_l, cond_s = False, True
             trade_info_update['side'] = 'SELL'
+        elif pos < -1e-8:
+            cond_l, cond_s = True, False
+            trade_info_update['side'] = 'BUY'
+        else:
+            raise ValueError(f'invalid pos got:{pos}, {position=}')
+        if status == 1:
             trade_info_update['enpp'] = position['pprice']
             trade_info_update['eOrderId'] = position['pOrderId']
-            cond_l, cond_s = False, True
         elif status == 2:
-            trade_info_update['side'] = 'BUY'
             trade_info_update['enpp'] = position['sprice']
             trade_info_update['eOrderId'] = position['sOrderId']
-            cond_l, cond_s = True, False
         else:
             raise ValueError(f"Unknown status: {status}")
         price = float(trade_info_update['enpp'])
