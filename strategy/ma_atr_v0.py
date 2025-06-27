@@ -33,7 +33,7 @@ def get_data(args, cli):
     target_time = int(time.time())
     target_time = (target_time - (target_time %  3600)) * 1000
     for i in range(10):
-        gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 50)
+        gdf = cli.klines(args.symbol, "1h", limit = args.atr_window + 10)
         if gdf[-1][0] >= target_time: # 服务器端出现延迟的时候需要重新拉取
             break
         if i > 7:
@@ -117,18 +117,17 @@ def main(args):
     logging.basicConfig(
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
-    if not args.debug:
-        # get trade-info
-        pm = PositionManager(args.stgname)
-        position, status = upated_after_closed(args, cli, pm.load())
-        if status != 0:
-            send_message(
-                args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
-        pos = float(position['pos'])
-        # is trading time
-        if args.trade_price <= 1e-8 and dt.now().minute != 0:
-            pm.save(position)
-            return
+    # get trade-info
+    pm = PositionManager(args.stgname)
+    position, status = upated_after_closed(args, cli, pm.load())
+    if status != 0:
+        send_message(
+            args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
+    pos = float(position['pos'])
+    # is trading time
+    if dt.now().minute != 0:
+        pm.save(position)
+        return
     # trade logic
     gdf = get_data(args, cli)
     gdf = get_feat(gdf, args.atr_window, args.his_window)
@@ -136,7 +135,7 @@ def main(args):
     atr_idx = gdf.columns.get_loc('ATR')
     sig_idx = gdf.columns.get_loc('SIG')
     cond_l, cond_s, pprice, sprice, atr = get_signal(
-        gdf, price, args.k, args.s1, args.s2, args.cond_len,
+        gdf.values, price, args.k, args.s1, args.s2, args.cond_len,
         args.use_atr, args.follow_trend, atr_idx, sig_idx)
     orders, trade_info = get_orders(
         args, cli, pos, cond_l, cond_s, price, pprice, sprice) 
