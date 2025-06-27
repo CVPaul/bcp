@@ -56,7 +56,49 @@ def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend, atr_idx, 
 
 
 @nb.jit(nopython=True, cache=True)
-def _v0_(data, k, s1, s2, cond_len, use_atr, follow_trend, close, high, low, atr_idx, sig_idx):
+def _v1_(data, k, s1, s2, cond_len, use_atr, follow_trend, close, high, low, atr_idx, sig_idx):
+    trans = []
+    # main logical
+    start_pos = cond_len + 1
+    mp, enpp, entt, sss, ppp = 0, 0, 0, 0, 0
+    for i in range(start_pos, data.shape[0]):
+        row = data[i]
+        price_t = row[close]
+        cond_l, cond_s, pprice, sprice, atr = get_signal(
+            data[i - start_pos:i + 1], price_t, k, s1, s2, cond_len,
+            use_atr, follow_trend, atr_idx, sig_idx)
+        # loss
+        if mp > 0 and row[low] <= sss:
+            trans.append([mp, enpp, sss, entt, i])
+            mp = 0
+        if mp < 0 and row[high] >= sss:
+            trans.append([mp, enpp, sss, entt, i])
+            mp = 0
+        # profit
+        if mp > 0 and row[high] >= ppp:
+            trans.append([mp, enpp, ppp, entt, i])
+            mp = 0
+        if mp < 0 and row[low] <= ppp:
+            trans.append([mp, enpp, ppp, entt, i])
+            mp = 0
+        # sell
+        if mp >= 0 and cond_s:
+            if mp != 0:
+                trans.append([mp, enpp, price_t, entt, i])
+            entt = i
+            enpp, ppp, sss = price_t, pprice, sprice
+            mp = -1 
+        # buy
+        if mp <= 0 and cond_l:
+            if mp != 0:
+                trans.append([mp, enpp, price_t, entt, i])
+            entt = i
+            enpp, ppp, sss = price_t, pprice, sprice
+            mp = 1
+    return trans
+
+
+def _v2_(data, k, s1, s2, cond_len, use_atr, follow_trend, close, high, low, atr_idx, sig_idx):
     trans = []
     # main logical
     start_pos = cond_len + 1
@@ -108,7 +150,7 @@ def search(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, atr_win
     low = columns.index('low')
     atr_idx = columns.index('ATR')
     sig_idx = columns.index('SIG')
-    return _v0_(data, k, s1, s2, cond_len, use_atr, follow_trend,
+    return _v1_(data, k, s1, s2, cond_len, use_atr, follow_trend,
            close, high, low, atr_idx, sig_idx)
 
 

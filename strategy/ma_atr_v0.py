@@ -25,39 +25,7 @@ from strategy.common.utils import upated_after_closed
 from strategy.indicator.common import ATR
 from tools.feishu.sender import send_message
 from tools.feishu.sender import send_exception
-
-
-def main(args):
-    # args infer
-    assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
-    api_key, private_key = load_api_keys(args.account)
-    if args.is_um:
-        cli = USDM(api_key=api_key, private_key=private_key)
-    else:
-        cli = CoinM(api_key=api_key, private_key=private_key)
-    logging.basicConfig(
-        filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
-    if not args.debug:
-        # get trade-info
-        pm = PositionManager(args.stgname)
-        position, status = upated_after_closed(args, cli, pm.load())
-        if status != 0:
-            send_message(
-                args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
-        pos = float(position['pos'])
-        # is trading time
-        if args.trade_price <= 1e-8 and dt.now().minute != 0:
-            pm.save(position)
-            return
-    gdf = get_data(args, cli)
-    enpp = gdf.close.iloc[-1]
-    cond_l, cond_s, pprice, sprice, atr = get_signal(
-        gdf, enpp, args.k, args.s1, args.s2, args.cond_len,
-        args.use_atr, args.follow_trend, args.atr_window, args.his_window)
-    orders, trade_info = get_orders(
-        args, cli, pos, cond_l, cond_s, enpp, pprice, sprice) 
-    execute(args, cli, orders, trade_info)
+from prototype.v3 import get_feat, get_signal
 
 
 def get_data(args, cli):
@@ -135,7 +103,48 @@ def execute(args, cli, orders, trade_info):
         trade_info[key] = res['orderId']
     pm = PositionManager(args.stgname)
     pm.save(trade_info)
-    return res
+    return trade_info
+
+
+def main(args):
+    # args infer
+    assert '_' not in args.stgname, '"_" is not allowed to include in the stgname'
+    api_key, private_key = load_api_keys(args.account)
+    if args.is_um:
+        cli = USDM(api_key=api_key, private_key=private_key)
+    else:
+        cli = CoinM(api_key=api_key, private_key=private_key)
+    logging.basicConfig(
+        filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
+    if not args.debug:
+        # get trade-info
+        pm = PositionManager(args.stgname)
+        position, status = upated_after_closed(args, cli, pm.load())
+        if status != 0:
+            send_message(
+                args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
+        pos = float(position['pos'])
+        # is trading time
+        if args.trade_price <= 1e-8 and dt.now().minute != 0:
+            pm.save(position)
+            return
+    # trade logic
+    gdf = get_data(args, cli)
+    gdf = get_feat(gdf, args.atr_window, args.his_window)
+    price = gdf.close.iloc[-1]
+    atr_idx = gdf.columns.get_loc('ATR')
+    sig_idx = gdf.columns.get_loc('SIG')
+    cond_l, cond_s, pprice, sprice, atr = get_signal(
+        gdf, price, args.k, args.s1, args.s2, args.cond_len,
+        args.use_atr, args.follow_trend, atr_idx, sig_idx)
+    orders, trade_info = get_orders(
+        args, cli, pos, cond_l, cond_s, price, pprice, sprice) 
+    if orders: # new open
+        # cancel_all(args.symbol, cli, position)
+        # execute(args, cli, orders, trade_info)
+        logging.info(f"{args.stgname} executed orders: {orders}")
+        logging.info(f"{args.stgname} trade_info: {trade_info}")
 
 
 if __name__ == "__main__":
