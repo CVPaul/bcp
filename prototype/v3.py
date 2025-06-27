@@ -7,6 +7,7 @@ Created on Thu Aug  3 16:01:04 2023
 """
 
 
+import numba as nb
 from strategy.indicator.common import ATR
 
 
@@ -19,10 +20,11 @@ def get_feat(gdf, atr_window=24, his_window=7):
     return gdf
 
 
-def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend):
+@nb.jit(nopython=True, cache=True)
+def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend, atr_idx, sig_idx):
     # trade
-    atr = gdf.ATR.values[-1]
-    sigs = gdf.SIG.values[-cond_len - 1:]
+    atr = gdf[-1, atr_idx]
+    sigs = gdf[-cond_len - 1:, sig_idx]
     go_up = go_down = True
     for i in range(cond_len):
         go_up = go_up and (sigs[-2 - i] > 0)
@@ -53,31 +55,30 @@ def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend):
     return cond_l, cond_s, pprice, sprice, atr
 
 
-def search(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, atr_window=24, his_window=7):
-    # main logical
+@nb.jit(nopython=True, cache=True)
+def _v0_(data, k, s1, s2, cond_len, use_atr, follow_trend, close, high, low, atr_idx, sig_idx):
     trans = []
-    # k, s1, s2 = 0.08, 10e-2, 1e-2
+    # main logical
+    start_pos = cond_len + 1
     mp, enpp, entt, sss, ppp = 0, 0, 0, 0, 0
-    start_pos = cond_len + 1 if use_atr else 1
-    data = get_feat(df, atr_window, his_window)
     for i in range(start_pos, data.shape[0]):
-        row = data.iloc[i]
-        price_t = row['close']
+        row = data[i]
+        price_t = row[close]
         cond_l, cond_s, pprice, sprice, atr = get_signal(
-            data.iloc[i - start_pos:i + 1], price_t, k, s1, s2, cond_len,
-            use_atr, follow_trend)
+            data[i - start_pos:i + 1], price_t, k, s1, s2, cond_len,
+            use_atr, follow_trend, atr_idx, sig_idx)
         # loss
-        if mp > 0 and row['low'] <= sss:
+        if mp > 0 and row[low] <= sss:
             trans.append([mp, enpp, sss, entt, i])
             mp = 0
-        if mp < 0 and row['high'] >= sss:
+        if mp < 0 and row[high] >= sss:
             trans.append([mp, enpp, sss, entt, i])
             mp = 0
         # profit
-        if mp > 0 and row['high'] >= ppp:
+        if mp > 0 and row[high] >= ppp:
             trans.append([mp, enpp, ppp, entt, i])
             mp = 0
-        if mp < 0 and row['low'] <= ppp:
+        if mp < 0 and row[low] <= ppp:
             trans.append([mp, enpp, ppp, entt, i])
             mp = 0
         # sell
@@ -95,6 +96,20 @@ def search(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, atr_win
             enpp, ppp, sss = price_t, pprice, sprice
             mp = 1
     return trans
+
+
+def search(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, atr_window=24, his_window=7):
+    # k, s1, s2 = 0.08, 10e-2, 1e-2
+    data = get_feat(df, atr_window, his_window)
+    columns = data.columns.to_list()
+    data = data.values
+    close = columns.index('close')
+    high = columns.index('high')
+    low = columns.index('low')
+    atr_idx = columns.index('ATR')
+    sig_idx = columns.index('SIG')
+    return _v0_(data, k, s1, s2, cond_len, use_atr, follow_trend,
+           close, high, low, atr_idx, sig_idx)
 
 
 def search2(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, reverse=False):
