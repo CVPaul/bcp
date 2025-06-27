@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
+"""
+Created on Thu Aug  3 16:01:04 2023
+"""
+
+
+from strategy.indicator.common import ATR
+
+
+def get_feat(gdf, atr_window=24, his_window=7):
+    # init
+    gdf['ATR'] = ATR(atr_window, gdf).calc(gdf)  # atr shift 1
+    gdf['MA7'] = gdf.close.rolling(his_window).mean()
+    gdf['DIF'] = gdf.MA7.diff()
+    gdf['SIG'] = gdf['DIF'] / gdf['ATR']
+    return gdf
+
+
+def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend):
+    # trade
+    atr = gdf.ATR.values[-1]
+    sigs = gdf.SIG.values[-cond_len - 1:]
+    go_up = go_down = True
+    for i in range(cond_len):
+        go_up = go_up and (sigs[-2 - i] > 0)
+        go_down = go_down and (sigs[-2 - i] < 0)
+    final_up = sigs[-1] > k
+    final_down = sigs[-1] < -k
+    if follow_trend:
+        cond_l = go_up and final_up
+        cond_s = go_down and final_down
+    else:
+        cond_l = go_down and final_up
+        cond_s = go_up and final_down
+    pprice = sprice = 0
+    if cond_l:
+        if use_atr:
+            pprice = price + s1 * atr
+            sprice = price - s2 * atr
+        else:
+            pprice = price * (1 + s1)
+            sprice = price * (1 - s2)
+    if cond_s:
+        if use_atr:
+            pprice = price - s1 * atr
+            sprice = price + s2 * atr
+        else:
+            pprice = price * (1 - s1)
+            sprice = price * (1 + s2)
+    return cond_l, cond_s, pprice, sprice, atr
+
+
+def search(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, atr_window=24, his_window=7):
+    # main logical
+    trans = []
+    # k, s1, s2 = 0.08, 10e-2, 1e-2
+    mp, enpp, entt, sss, ppp = 0, 0, 0, 0, 0
+    start_pos = cond_len + 1 if use_atr else 1
+    data = get_feat(df, atr_window, his_window)
+    for i in range(start_pos, data.shape[0]):
+        row = data.iloc[i]
+        price_t = row['close']
+        cond_l, cond_s, pprice, sprice, atr = get_signal(
+            data.iloc[i - start_pos:i + 1], price_t, k, s1, s2, cond_len,
+            use_atr, follow_trend)
+        # loss
+        if mp > 0 and row['low'] <= sss:
+            trans.append([mp, enpp, sss, entt, i])
+            mp = 0
+        if mp < 0 and row['high'] >= sss:
+            trans.append([mp, enpp, sss, entt, i])
+            mp = 0
+        # profit
+        if mp > 0 and row['high'] >= ppp:
+            trans.append([mp, enpp, ppp, entt, i])
+            mp = 0
+        if mp < 0 and row['low'] <= ppp:
+            trans.append([mp, enpp, ppp, entt, i])
+            mp = 0
+        # sell
+        if mp >= 0 and cond_s:
+            if mp != 0:
+                trans.append([mp, enpp, price_t, entt, i])
+            entt = i
+            enpp, ppp, sss = price_t, pprice, sprice
+            mp = -1 
+        # buy
+        if mp <= 0 and cond_l:
+            if mp != 0:
+                trans.append([mp, enpp, price_t, entt, i])
+            entt = i
+            enpp, ppp, sss = price_t, pprice, sprice
+            mp = 1
+    return trans
+
+
+def search2(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, reverse=False):
+    # main logical
+    data = df.values
+    columns = df.columns.to_list()
+    m4 = columns.index('M4')
+    m5 = columns.index('M5')
+    high = columns.index('high')
+    low = columns.index('low')
+    close = columns.index('close')
+    price_t = close
+
+    trans = []
+    # k, s1, s2 = 0.08, 10e-2, 1e-2
+    mp, enpp, entt, sss, ppp = 0, 0, 0, 0, 0
+    last_1_m4, last_2_m4, last_3_m4, last_4_m4 = 0, 0, 0, 0
+    for i in range(1, df.shape[0]):
+        row = data[i]
+        # loss
+        if mp > 0 and row[low] <= sss:
+            trans.append([mp, enpp, sss, entt, i])
+            enpp = sss
+            ppp = enpp - s1 * row[m5]
+            sss = enpp + s2 * row[m5]
+            mp = -mp
+        if mp < 0 and row[high] >= sss:
+            trans.append([mp, enpp, sss, entt, i])
+            enpp = sss
+            ppp = enpp + s1 * row[m5]
+            sss = enpp - s2 * row[m5]
+            mp = -mp
+        # profit
+        if mp > 0 and row[high] >= ppp:
+            trans.append([mp, enpp, ppp, entt, i])
+            enpp = ppp
+            ppp = enpp - s1 * row[m5]
+            sss = enpp + s2 * row[m5]
+            mp = -mp
+        if mp < 0 and row[low] <= ppp:
+            trans.append([mp, enpp, ppp, entt, i])
+            enpp = ppp
+            ppp = enpp + s1 * row[m5]
+            sss = enpp - s2 * row[m5]
+            mp = -mp
+        if cond_len == 0:
+            cond_l = True
+            cond_s = True
+        elif cond_len == 1:
+            cond_l = last_1_m4 < 0
+            cond_s = last_1_m4 > 0
+        elif cond_len == 2:
+            cond_l = (last_1_m4 < 0 and last_2_m4 < 0)
+            cond_s = (last_1_m4 > 0 and last_2_m4 > 0)
+        elif cond_len == 3:
+            cond_l = (last_1_m4 < 0 and last_2_m4 < 0 and last_3_m4 < 0)
+            cond_s = (last_1_m4 > 0 and last_2_m4 > 0 and last_3_m4 > 0)
+        elif cond_len == 4:
+            cond_l = (last_1_m4 < 0 and last_2_m4 < 0 and last_3_m4 < 0 and last_4_m4 < 0)
+            cond_s = (last_1_m4 > 0 and last_2_m4 > 0 and last_3_m4 > 0 and last_4_m4 > 0)
+        else:
+            raise ValueError(f'invalid {cond_len=}')
+        if follow_trend:
+            cond_l, cond_s = (cond_s and (row[m4] > k)), (cond_l and (row[m4] < -k))
+        else:
+            cond_l = cond_l and (row[m4] > k)
+            cond_s = cond_s and (row[m4] < -k)
+        if reverse:
+            cond_l, cond_s = cond_s, cond_l
+        # sell
+        if mp >= 0 and cond_s:
+            if mp != 0:
+                trans.append([mp, enpp, row[price_t], entt, i])
+            entt = i
+            enpp = row[price_t]
+            if use_atr:
+                ppp = enpp - s1 * row[m5]
+                sss = enpp + s2 * row[m5]
+            else:
+                ppp = enpp * (1 - s1)
+                sss = enpp * (1 + s2)
+            mp = -1 
+        # buy
+        if mp <= 0 and cond_l:
+            if mp != 0:
+                trans.append([mp, enpp, row[price_t], entt, i])
+            entt = i
+            enpp = row[price_t]
+            if use_atr:
+                ppp = enpp + s1 * row[m5]
+                sss = enpp - s2 * row[m5]
+            else:
+                ppp = enpp * (1 + s1)
+                sss = enpp * (1 - s2)
+            mp = 1
+        last_4_m4 = last_3_m4
+        last_3_m4 = last_2_m4
+        last_2_m4 = last_1_m4
+        last_1_m4 = row[m4]
+    return trans

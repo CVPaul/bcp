@@ -23,6 +23,7 @@ logging.basicConfig(
 )
 
 if __name__ == "__main__":
+    print("hello world")
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str, required=True)
     parser.add_argument(
@@ -39,6 +40,7 @@ if __name__ == "__main__":
         cli = USDM()
         args.symbol = f'{args.symbol}{args.usx}'.upper()
     # Database connection
+    print(args)
     conn = sqlite3.connect(f"data/{args.symbol}.db")
     cursor = conn.cursor()
     # Determine start_time
