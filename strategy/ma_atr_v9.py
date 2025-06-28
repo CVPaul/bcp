@@ -69,7 +69,7 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
         trade_info = {'pos': args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
         if args.is_um:
             order['quantity'] = round_it(
-                args.vol + pos if pos > 1e-8 else args.vol, lot_round_at(args.symbol))
+                args.vol + (pos if pos > 1e-8 else args.vol), lot_round_at(args.symbol))
         order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
@@ -215,7 +215,7 @@ def main(args):
         # update the trade info
         trade_info.update(trade_info_update)
     if orders: # new open
-        # execute(args, cli, orders, trade_info)
+        execute(args, cli, orders, trade_info)
         logging.info(f"{args.stgname} executed orders: {orders}")
         logging.info(f"{args.stgname} trade_info: {trade_info}")
 
