@@ -62,6 +62,7 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
         order["price"] = round_it(enpp * (1 - args.profit), round_at(args.symbol))
     else:
         logging.info(f"POSITION|{pos}")
+    trade_info = {}
     if order['quantity'] > 1e-8:
         if args.is_um:
             order['quantity'] = round_it(order['quantity'], lot_round_at(args.symbol))
