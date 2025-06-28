@@ -174,12 +174,12 @@ def main(args):
         # trade logic
         gdf = get_data(args, cli)
         gdf = get_feat(gdf, args.atr_window, args.his_window)
-        price = gdf.close.iloc[-1]
+        price = gdf.close.iloc[-1].item()
         atr_idx = gdf.columns.get_loc('ATR')
         sig_idx = gdf.columns.get_loc('SIG')
         cond_l, cond_s, pprice, sprice = get_signal(
             gdf.values, price, args.k, args.s1, args.s2, args.cond_len,
-            args.use_atr, args.follow_trend, atr_idx, sig_idx)
+            args.use_atr, args.follow_trend, atr_idx, sig_idx, atr_loc=-2)
         orders, trade_info = get_orders(
             args, pos, cond_l, cond_s, price, pprice, sprice) 
         if orders:

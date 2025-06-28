@@ -21,9 +21,9 @@ def get_feat(gdf, atr_window=24, his_window=7):
 
 
 @nb.jit(nopython=True, cache=True)
-def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend, atr_idx, sig_idx):
+def get_signal(gdf, price, k, s1, s2, cond_len, use_atr, follow_trend, atr_idx, sig_idx, atr_loc=-1):
     # trade
-    atr = gdf[-1, atr_idx]
+    atr = gdf[atr_loc, atr_idx] # 对于V9这里的atr_loc=-2是为了保持开仓的时候是上一个ATR, 但是status=1|2的时候则不需
     sigs = gdf[-cond_len - 1:, sig_idx]
     go_up = go_down = True
     for i in range(cond_len):

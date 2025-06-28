@@ -131,7 +131,7 @@ def main(args):
     # trade logic
     gdf = get_data(args, cli)
     gdf = get_feat(gdf, args.atr_window, args.his_window)
-    price = gdf.close.iloc[-1]
+    price = gdf.close.iloc[-1].item()
     atr_idx = gdf.columns.get_loc('ATR')
     sig_idx = gdf.columns.get_loc('SIG')
     cond_l, cond_s, pprice, sprice = get_signal(
