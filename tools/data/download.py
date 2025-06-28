@@ -23,11 +23,11 @@ logging.basicConfig(
 )
 
 if __name__ == "__main__":
-    print("hello world")
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str, required=True)
     parser.add_argument(
         '--type', '-t', type=str, choices=['um', 'cm'], default='cm')
+    parser.add_argument('--force', action='store_true')
     parser.add_argument('--usx', '-u', type=str, default='USDT')
     parser.add_argument('--start-time', '-st', type=str)
     parser.add_argument('--end-time', '-et', type=str)
@@ -73,6 +73,11 @@ if __name__ == "__main__":
         )
     ''')
     conn.commit()
+    # 如果 --force，先删除时间范围内的数据
+    if args.force:
+        logging.info(f"Force mode: deleting klines from {start_t} to {end_t} for {args.symbol}")
+        cursor.execute('DELETE FROM klines WHERE start_t >= ? AND start_t < ?', (start_t, end_t))
+        conn.commit()
     # Data fetching loop
     while start_t < end_t:
         dat = cli.klines(
@@ -83,7 +88,6 @@ if __name__ == "__main__":
         day = pd.to_datetime(start_t * 1e6)
         assert dat[-1][0] == start_t + N_MS_PER_DAY, \
             f"Data mismatch: {dat[-1][0]} vs {start_t + N_MS_PER_DAY}"
-        
         start_t = dat[-1][0]
         df = pd.DataFrame(dat[:-1], columns=[
             'start_t', 'open', 'high', 'low', 'close',
