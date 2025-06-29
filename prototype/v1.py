@@ -11,8 +11,8 @@ def search(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, reverse
     # main logical
     data = df.values
     columns = df.columns.to_list()
-    m4 = columns.index('M4')
-    m5 = columns.index('M5')
+    m4 = columns.index('SIG')
+    m5 = columns.index('ATR')
     high = columns.index('high')
     low = columns.index('low')
     close = columns.index('close')
@@ -99,8 +99,8 @@ def search2(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, revers
     # main logical
     data = df.values
     columns = df.columns.to_list()
-    m4 = columns.index('M4')
-    m5 = columns.index('M5')
+    m4 = columns.index('SIG')
+    m5 = columns.index('ATR')
     high = columns.index('high')
     low = columns.index('low')
     close = columns.index('close')
@@ -113,31 +113,32 @@ def search2(df, k, s1, s2, cond_len=2, use_atr=False, follow_trend=False, revers
     for i in range(1, df.shape[0]):
         row = data[i]
         # loss
-        if mp > 0 and row[low] <= sss:
-            trans.append([mp, enpp, sss, entt, i])
-            enpp = sss
-            ppp = enpp - s1 * row[m5]
-            sss = enpp + s2 * row[m5]
-            mp = -mp
-        if mp < 0 and row[high] >= sss:
-            trans.append([mp, enpp, sss, entt, i])
-            enpp = sss
-            ppp = enpp + s1 * row[m5]
-            sss = enpp - s2 * row[m5]
-            mp = -mp
-        # profit
-        if mp > 0 and row[high] >= ppp:
-            trans.append([mp, enpp, ppp, entt, i])
-            enpp = ppp
-            ppp = enpp - s1 * row[m5]
-            sss = enpp + s2 * row[m5]
-            mp = -mp
-        if mp < 0 and row[low] <= ppp:
-            trans.append([mp, enpp, ppp, entt, i])
-            enpp = ppp
-            ppp = enpp + s1 * row[m5]
-            sss = enpp - s2 * row[m5]
-            mp = -mp
+        if mp > 0:
+            if row[low] <= sss:
+                trans.append([mp, enpp, sss, entt, i])
+                entt, enpp = i, sss
+                ppp = enpp - s1 * row[m5]
+                sss = enpp + s2 * row[m5]
+                mp = -mp
+            elif row[high] >= ppp:
+                trans.append([mp, enpp, ppp, entt, i])
+                entt, enpp = i, ppp
+                ppp = enpp - s1 * row[m5]
+                sss = enpp + s2 * row[m5]
+                mp = -mp
+        elif mp < 0:
+            if row[high] >= sss:
+                trans.append([mp, enpp, sss, entt, i])
+                entt, enpp = i, sss
+                ppp = enpp + s1 * row[m5]
+                sss = enpp - s2 * row[m5]
+                mp = -mp
+            elif row[low] <= ppp:
+                trans.append([mp, enpp, ppp, entt, i])
+                entt, enpp = i, ppp
+                ppp = enpp + s1 * row[m5]
+                sss = enpp - s2 * row[m5]
+                mp = -mp
         if cond_len == 0:
             cond_l = True
             cond_s = True
