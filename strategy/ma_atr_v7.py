@@ -76,7 +76,7 @@ def main(args):
             'volume', 'end_t', 'amount', 'trade_cnt',
             'taker_vol', 'taker_amt', 'reserved'
         ]).astype(float)
-    enpp = gdf.close.iloc[-1]
+    enpp = gdf.close.iloc[-1].item()
     if args.is_um:
         args.vol = args.usd / enpp
     gdf['ATR'] = ATR(args.atr_window, gdf).calc(gdf)

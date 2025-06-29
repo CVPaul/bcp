@@ -57,7 +57,7 @@ def get_prices(cond_l, cond_s, price, s1, s2, use_atr, atr):
         else:
             pprice = price * (1 - s1)
             sprice = price * (1 + s2)
-    return pprice, sprice
+    return pprice, sprice, atr
 
 
 @nb.jit(nopython=True, cache=True)

@@ -143,7 +143,7 @@ def upated_after_closed(args, cli, position):
 
 def execute(args, cli, orders, trade_info):
     for key, order in orders.items():
-        res = cli.order(**order)
+        res = cli.new_order(**order)
         trade_info[key] = res['orderId']
     pm = PositionManager(args.stgname)
     pm.save(trade_info)
@@ -177,13 +177,15 @@ def main(args):
         price = gdf.close.iloc[-1].item()
         atr_idx = gdf.columns.get_loc('ATR')
         sig_idx = gdf.columns.get_loc('SIG')
-        cond_l, cond_s, pprice, sprice = get_signal(
+        cond_l, cond_s, pprice, sprice, atr = get_signal(
             gdf.values, price, args.k, args.s1, args.s2, args.cond_len,
             args.use_atr, args.follow_trend, atr_idx, sig_idx, atr_loc=-2)
         orders, trade_info = get_orders(
             args, pos, cond_l, cond_s, price, pprice, sprice) 
         if orders:
             cancel_all(args.symbol, cli, position)
+            send_message(
+                    args.symbol, f"{args.stgname} Open with {atr=:.6f}", str(trade_info))
     else:
         send_message(
             args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))

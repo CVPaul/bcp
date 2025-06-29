@@ -134,7 +134,7 @@ def main(args):
     price = gdf.close.iloc[-1].item()
     atr_idx = gdf.columns.get_loc('ATR')
     sig_idx = gdf.columns.get_loc('SIG')
-    cond_l, cond_s, pprice, sprice = get_signal(
+    cond_l, cond_s, pprice, sprice, atr = get_signal(
         gdf.values, price, args.k, args.s1, args.s2, args.cond_len,
         args.use_atr, args.follow_trend, atr_idx, sig_idx)
     orders, trade_info = get_orders(
@@ -142,6 +142,8 @@ def main(args):
     if orders: # new open
         # cancel_all(args.symbol, cli, position)
         # execute(args, cli, orders, trade_info)
+        send_message(
+            args.symbol, f"{args.stgname} Open with {atr=:.6f}", str(trade_info))
         logging.info(f"{args.stgname} executed orders: {orders}")
         logging.info(f"{args.stgname} trade_info: {trade_info}")
 
