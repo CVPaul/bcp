@@ -120,27 +120,23 @@ def _v2_(data, k, s1, s2, clen, use_atr, follow_trend, close, high, low, atr_idx
             if row[low] <= sss:
                 trans.append([mp, enpp, sss, entt, i, 0])
                 entt, enpp = i, sss
-                ppp = enpp - s1 * atr
-                sss = enpp + s2 * atr
+                ppp, sss, _ = get_prices(False, True, enpp, s1, s2, use_atr, atr)
                 mp = -mp
             elif ppp > 1e-8 and row[high] >= ppp:
                 trans.append([mp, enpp, ppp, entt, i, 1])
                 entt, enpp = i, ppp
-                ppp = enpp - s1 * atr
-                sss = enpp + s2 * atr
+                ppp, sss, _ = get_prices(False, True, enpp, s1, s2, use_atr, atr)
                 mp = -mp
         elif mp < 0:
             if sss > 1e-8 and row[high] >= sss:
                 trans.append([mp, enpp, sss, entt, i, 2])
                 entt, enpp = i, sss
-                ppp = enpp + s1 * atr
-                sss = enpp - s2 * atr
+                ppp, sss, _ = get_prices(True, False, enpp, s1, s2, use_atr, atr)
                 mp = -mp
             elif row[low] <= ppp:
                 trans.append([mp, enpp, ppp, entt, i, 3])
                 entt, enpp = i, ppp
-                ppp = enpp + s1 * atr
-                sss = enpp - s2 * atr
+                ppp, sss, _ = get_prices(True, False, enpp, s1, s2, use_atr, atr)
                 mp = -mp
         # sell
         if mp >= 0 and cond_s:
