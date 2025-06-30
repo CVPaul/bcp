@@ -209,7 +209,7 @@ def main(args):
         else:
             raise ValueError(f"Unknown status: {status}")
         price = float(trade_info_update['enpp'])
-        pprice, sprice = get_prices(
+        pprice, sprice, _ = get_prices(
             cond_l, cond_s, price, args.s1, args.s2, args.use_atr, atr)
         orders, trade_info = get_orders(
             args, pos, cond_l, cond_s, price, pprice, sprice)
