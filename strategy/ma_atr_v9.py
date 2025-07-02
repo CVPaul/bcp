@@ -66,7 +66,9 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
         if args.is_um:
             order['quantity'] = round_it(order['quantity'], lot_round_at(args.symbol))
         orders['eOrderId'] = copy.deepcopy(order)
-        trade_info = {'pos': args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
+        trade_info = {
+            'pos': args.vol if order['side'] == 'BUY' else -args.vol,
+            'enpp': enpp, 'side':order['side']}
         if args.is_um:
             order['quantity'] = round_it(
                 args.vol + (pos if pos > 1e-8 else args.vol), lot_round_at(args.symbol))
@@ -80,19 +82,21 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
         orders['pOrderId'] = copy.deepcopy(order)
         trade_info['pprice'] = order['price']
         # ----------------------------------------------------------------------------
-        order['type'] = 'STOP_MARKET' # 止损单
+        order['type'] = args.loss_type # 止损单
         if order['side'] == 'SELL': # side已经在上面修改过了
             if order['type'] == 'STOP_MARKET' and 'price' in order:
                 order.pop('price')
+                order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
             else:
                 order['price'] = round_it(sprice, round_at(args.symbol))
-            order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
+                order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
         else:
             if order['type'] == 'STOP_MARKET' and 'price' in order:
                 order.pop('price')
+                order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
             else:
                 order['price'] = round_it(sprice, round_at(args.symbol))
-            order['stopPrice'] = round_it(sprice * (1 - args.profit), round_at(args.symbol))
+                order['stopPrice'] = round_it(sprice * (1 + args.profit), round_at(args.symbol))
         orders['sOrderId'] = copy.deepcopy(order)
         trade_info['sprice'] = order['stopPrice']
     return orders, trade_info
@@ -185,12 +189,12 @@ def main(args):
         if orders:
             cancel_all(args.symbol, cli, position)
             send_message(
-                    args.symbol, f"{args.stgname} Open with {atr=:.6f}", str(trade_info))
+                args.symbol, f"{args.stgname} {trade_info['side']}@{price} with {atr=:.6f}", str(trade_info))
     else:
-        send_message(
-            args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
         gdf = get_data(args, cli)
         atr = ATR(args.atr_window).calc(gdf).values[-1]
+        send_message(
+            args.symbol, f"{args.stgname} update pos after closed({status=}|{atr=:.6f})", str(pm.load()))
         trade_info_update = {}
         if pos > 1e-8:
             cond_l, cond_s = False, True
@@ -244,6 +248,7 @@ if __name__ == "__main__":
         parser.add_argument('--trade-price', '-tp', type=float, default=0)
         parser.add_argument('--trade-side', '-ts', type=str, choices=['BUY', 'SELL'])
         parser.add_argument('--stgname', type=str, default='backtest')
+        parser.add_argument('--loss-type', type=str, default='STOP_MARKET')
         args = parser.parse_args()
         if not args.use_atr:
             assert args.s1 < 1 and args.s2 < 1, f'{args.s1=} and {args.s2=} is reqired to less than 1.0 without atr use'

@@ -1,2 +1,2 @@
 cd ~/bcp
-crontab -l|grep ${1:-eth}|head -1|awk -F">>" '{print $1"--debug"}'|awk -F"python" '{print $2}'|PYTHONPATH=. xargs python
+PYTHONPATH=. python tools/market/debug.py -s ${1:-eth} --k ${2:-0.06}
