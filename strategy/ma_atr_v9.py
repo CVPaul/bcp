@@ -70,8 +70,9 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
             'pos': args.vol if order['side'] == 'BUY' else -args.vol,
             'enpp': enpp, 'side':order['side']}
         if args.is_um:
+            abs_pos = abs(pos)
             order['quantity'] = round_it(
-                args.vol + (pos if pos > 1e-8 else args.vol), lot_round_at(args.symbol))
+                args.vol + (abs_pos if abs_pos > 1e-8 else args.vol), lot_round_at(args.symbol))
         order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
