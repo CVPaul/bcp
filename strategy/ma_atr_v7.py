@@ -47,9 +47,9 @@ def main(args):
         # get trade-info
         pm = PositionManager(args.stgname)
         position, status = upated_after_closed(args, cli, pm.load())
-        if status != 0:
-            send_message(
-                args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
+        # if status != 0:
+        #     send_message(
+        #         args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
         pos = float(position['pos'])
         # is trading time
         if args.trade_price <= 1e-8 and dt.now().minute != 0:
@@ -196,7 +196,7 @@ def main(args):
         res = cli.new_order(**order)
         trade_info['sprice'] = order['stopPrice']
         trade_info['sOrderId'] = res['orderId']
-        send_message(args.symbol, title, str(trade_info))
+        # send_message(args.symbol, title, str(trade_info))
         # ----------------------------------------------------------------------------
         pm.save(trade_info)
     elif order['quantity'] < 0:

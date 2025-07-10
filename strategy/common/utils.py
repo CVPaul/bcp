@@ -151,12 +151,17 @@ def cancel_all(args, cli, position):
     sOrderId = position.get('sOrderId', 0)
     if pOrderId:
         try:
-            cli.cancel_order(args.symbol, orderId=pOrderId)
-        except:
+            ret = cli.cancel_order(args.symbol, orderId=pOrderId)
+            logging.info(f"[status=3]cancel order succeeded with {args.symbol=}|{sOrderId=}|{pOrderId=}|{ret=}")
+        except Exception as err:
+            logging.error(f"[status=3]cancel order failed with {args.symbol=}|{sOrderId=}|{pOrderId=}|{err=}")
             pass # no matter is it succeeded
     if sOrderId:
         try:
-            cli.cancel_order(args.symbol, orderId=sOrderId)
+            ret = cli.cancel_order(args.symbol, orderId=sOrderId)
+            logging.info(f"[status=4]cancel order succeeded with {args.symbol=}|{sOrderId=}|{pOrderId=}|{ret=}")
+        except Exception as err:
+            logging.error(f"[status=4]cancel order failed with {args.symbol=}|{sOrderId=}|{pOrderId=}|{err=}")
         except:
             pass # no matter is it succeeded
 

@@ -103,7 +103,7 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
     return orders, trade_info
 
 
-def upated_after_closed(args, cli, position):
+def update_after_closed(args, cli, position):
     pOrderId = position.get('pOrderId', 0)
     sOrderId = position.get('sOrderId', 0)
     status = 0
@@ -120,8 +120,10 @@ def upated_after_closed(args, cli, position):
         if filled:
             if sOrderId:
                 try:
-                    cli.cancel_order(args.symbol, orderId=sOrderId)
-                except:
+                    ret = cli.cancel_order(args.symbol, orderId=sOrderId)
+                    logging.info(f"[status=1]cancel order succeeded with {args.symbol=}|{sOrderId=}|{pOrderId=}|{ret=}")
+                except Exception as err:
+                    logging.error(f"[status=1]cancel order failed with {args.symbol=}|{sOrderId=}|{pOrderId=}|{err=}")
                     pass # 无论是否撤成功都行
             sOrderId = 0
             status = 1
@@ -138,8 +140,10 @@ def upated_after_closed(args, cli, position):
         if filled:
             if pOrderId:
                 try:
-                    cli.cancel_order(args.symbol, orderId=pOrderId)
-                except:
+                    ret = cli.cancel_order(args.symbol, orderId=pOrderId)
+                    logging.info(f"[status=2]cancel order succeeded with {args.symbol=}|{sOrderId=}|{pOrderId=}|{ret=}")
+                except Exception as err:
+                    logging.error(f"[status=2]cancel order failed with {args.symbol=}|{sOrderId=}|{pOrderId=}|{err=}")
                     pass # 无论是否撤成功都行
             pOrderId = 0
             status = 2
@@ -169,12 +173,11 @@ def main(args):
     # get trade-info
     pm = PositionManager(args.stgname)
     position = pm.load()
-    status = upated_after_closed(args, cli, position)
+    status = update_after_closed(args, cli, position)
     pos = float(position['pos'])
     if status == 0:
         # is trading time
         if dt.now().minute != 0:
-            pm.save(position)
             return
         # trade logic
         gdf = get_data(args, cli)
@@ -188,14 +191,14 @@ def main(args):
         orders, trade_info = get_orders(
             args, pos, cond_l, cond_s, price, pprice, sprice) 
         if orders:
-            cancel_all(args.symbol, cli, position)
+            cancel_all(args, cli, position)
             send_message(
                 args.symbol, f"{args.stgname} {trade_info['side']}@{price} with {atr=:.6f}", str(trade_info))
     else:
         gdf = get_data(args, cli)
         atr = ATR(args.atr_window).calc(gdf).values[-1]
         send_message(
-            args.symbol, f"{args.stgname} update pos after closed({status=}|{atr=:.6f})", str(pm.load()))
+            args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
         trade_info_update = {}
         if pos > 1e-8:
             cond_l, cond_s = False, True

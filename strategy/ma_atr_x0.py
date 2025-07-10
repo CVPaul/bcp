@@ -66,7 +66,9 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
         if args.is_um:
             order['quantity'] = round_it(order['quantity'], lot_round_at(args.symbol))
         orders['eOrderId'] = copy.deepcopy(order)
-        trade_info = {'pos': args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
+        trade_info = {
+            'side': order['side'],
+            'pos': args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
         if args.is_um:
             order['quantity'] = round_it(
                 args.vol + (pos if pos > 1e-8 else args.vol), lot_round_at(args.symbol))
@@ -169,14 +171,16 @@ def main(args):
     if status == 0:
         # is trading time
         if dt.now().minute != 0:
-            pm.save(position)
             return
         # trade logic
         gdf = get_data(args, cli)
         gdf = get_feat(gdf, args.atr_window)
         price = gdf.close.iloc[-1].item()
         atr_idx = gdf.columns.get_loc('ATR')
-        sig_idx = gdf.columns.get_loc('SIG')
+        if args.cond_len < 1:
+            sig_idx = gdf.columns.get_loc('SIG')
+        else:
+            sig_idx = 10086
         dnn_idx = gdf.columns.get_loc('DNN')
         upp_idx = gdf.columns.get_loc('UPP')
         dif_idx = gdf.columns.get_loc('DIF')
@@ -186,9 +190,9 @@ def main(args):
         orders, trade_info = get_orders(
             args, pos, cond_l, cond_s, price, pprice, sprice) 
         if orders:
-            cancel_all(args.symbol, cli, position)
+            cancel_all(args, cli, position)
             send_message(
-                    args.symbol, f"{args.stgname} Open with {atr=:.6f}", str(trade_info))
+                    args.symbol, f"{args.stgname} {trade_info['side']}@{price}|{atr=:.6f}", str(trade_info))
     else:
         send_message(
             args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))

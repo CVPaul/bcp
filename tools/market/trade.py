@@ -39,7 +39,7 @@ def get_lot_size(exchange_info):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--symbol', '-s', type=str)
-    parser.add_argument('--account', '-a', type=str, default='zhou')
+    parser.add_argument('--account', '-a', type=str, default='li')
     args = parser.parse_args()
     # api_key, private_key = load_api_keys('li')
     # client = CoinM(api_key=api_key, private_key=private_key)
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     #     "timeInForce": "GTC", "price": '12.791',
     # }
     # res = client.new_order(**order)
-    res = client.get_orders(args.symbol) #, orderId=69332236674)
+    res = client.get_orders(args.symbol, orderId=14538408708)
     # res = client.exchange_info()
     # print(get_lot_size(res))
     print(pd.DataFrame(res).T)
