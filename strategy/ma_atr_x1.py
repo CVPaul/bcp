@@ -70,7 +70,8 @@ def get_orders(args, pos, cond_l, cond_s, enpp, pprice, sprice):
             'side': order['side'],
             'pos': args.vol if order['side'] == 'BUY' else -args.vol, 'enpp': enpp}
         if args.is_um:
-            order['quantity'] = args.vol
+            order['quantity'] = round_it(
+                args.vol + (pos if pos > 1e-8 else args.vol), lot_round_at(args.symbol))
         order['type'] = 'LIMIT' # 止盈单
         if order['side'] == 'BUY':
             order['side'] = 'SELL'
@@ -195,33 +196,33 @@ def main(args):
     else:
         send_message(
             args.symbol, f"{args.stgname} update pos after closed({status=})", str(pm.load()))
-        # gdf = get_data(args, cli)
-        # atr = ATR(args.atr_window).calc(gdf).values[-1]
-        # trade_info_update = {}
-        # if pos > 1e-8:
-        #     cond_l, cond_s = False, True
-        #     trade_info_update['side'] = 'SELL'
-        # elif pos < -1e-8:
-        #     cond_l, cond_s = True, False
-        #     trade_info_update['side'] = 'BUY'
-        # else:
-        #     raise ValueError(f'invalid pos got:{pos}, {position=}')
-        # if status == 1:
-        #     trade_info_update['enpp'] = position['pprice']
-        #     trade_info_update['eOrderId'] = position['pOrderId']
-        # elif status == 2:
-        #     trade_info_update['enpp'] = position['sprice']
-        #     trade_info_update['eOrderId'] = position['sOrderId']
-        # else:
-        #     raise ValueError(f"Unknown status: {status}")
-        # price = float(trade_info_update['enpp'])
-        # pprice, sprice = get_prices(
-        #     cond_l, cond_s, price, args.s1, args.s2, args.use_atr, atr)
-        # orders, trade_info = get_orders(
-        #     args, pos, cond_l, cond_s, price, pprice, sprice)
-        # orders.pop('eOrderId', None) # 只需要止盈止损单
-        # # update the trade info
-        # trade_info.update(trade_info_update)
+        gdf = get_data(args, cli)
+        atr = ATR(args.atr_window).calc(gdf).values[-1]
+        trade_info_update = {}
+        if pos > 1e-8:
+            cond_l, cond_s = False, True
+            trade_info_update['side'] = 'SELL'
+        elif pos < -1e-8:
+            cond_l, cond_s = True, False
+            trade_info_update['side'] = 'BUY'
+        else:
+            raise ValueError(f'invalid pos got:{pos}, {position=}')
+        if status == 1:
+            trade_info_update['enpp'] = position['pprice']
+            trade_info_update['eOrderId'] = position['pOrderId']
+        elif status == 2:
+            trade_info_update['enpp'] = position['sprice']
+            trade_info_update['eOrderId'] = position['sOrderId']
+        else:
+            raise ValueError(f"Unknown status: {status}")
+        price = float(trade_info_update['enpp'])
+        pprice, sprice = get_prices(
+            cond_l, cond_s, price, args.s1, args.s2, args.use_atr, atr)
+        orders, trade_info = get_orders(
+            args, pos, cond_l, cond_s, price, pprice, sprice)
+        orders.pop('eOrderId', None) # 只需要止盈止损单
+        # update the trade info
+        trade_info.update(trade_info_update)
     if orders: # new open
         execute(args, cli, orders, trade_info)
         logging.info(f"{args.stgname} executed orders: {orders}")
