@@ -163,6 +163,7 @@ def main(args):
         filename=f'{args.stgname}.log', level=logging.DEBUG if args.debug else logging.INFO,
         format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
     # get trade-info
+    orders = None
     pm = PositionManager(args.stgname)
     position = pm.load()
     status = upated_after_closed(args, cli, position)
