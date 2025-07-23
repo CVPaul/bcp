@@ -10,7 +10,7 @@ class PositionManager:
 
     def __init__(self, stgname):
         self.stgname = stgname
-        self.prefix = 'postions'
+        self.prefix = 'positions'
         self.path = f'{self.prefix}/{self.stgname}.json'
         os.makedirs(self.prefix, exist_ok=True)
         if not os.path.exists(self.path):
