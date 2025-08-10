@@ -6,7 +6,9 @@ Created on 2025-08-09
 Trend following strategy V4
 """
 
+
 import numba as nb
+import pandas as pd
 from strategy.indicator.common import ATR
 
 
@@ -28,16 +30,17 @@ def get_feat(gdf, atr_window=24, ma_window=10):
 def get_signal(gdf, price, k, s1, s2, clen, 
                use_atr, atr_idx, ma_idx, tr_idx, atr_loc=-1):
     """
-    Enhanced signal generation with multiple confirmations
+    Enhanced signal generation with multiple confirmations and ML filter
     """
     ma = gdf[-1, ma_idx]
     tr = gdf[-1, tr_idx]
     atr = gdf[atr_loc, atr_idx]
-    cond_x = (tr / atr) > clen  # Trend strength condition
-    # cond_l = cond_x and price > ma + k * atr
-    # cond_s = cond_x and price < ma - k * atr
+    
+    # Base conditions
+    cond_x = True # (tr / atr) > clen  # Trend strength condition
     cond_l = cond_x and ma / atr > k
     cond_s = cond_x and ma / atr < -k
+
     # Calculate entry/exit prices with adaptive sizing
     return cond_l, cond_s, *get_prices(
         cond_l, cond_s, price, s1, s2, use_atr, atr), atr
@@ -64,7 +67,8 @@ def get_prices(cond_l, cond_s, price, s1, s2, use_atr, atr):
 
 
 @nb.jit(nopython=True, cache=True)
-def _v4_(data, k, s1, s2, clen, use_atr, close, high, low, atr_idx, ma_idx, tr_idx):
+def _v4_(data, k, s1, s2, clen, use_atr, close, high, low, 
+         atr_idx, ma_idx, tr_idx, sig_idx):
     trans = []
     start_pos = clen + 1
     mp, enpp, entt, sss, ppp = 0, 0, 0, 0, 0
@@ -74,6 +78,7 @@ def _v4_(data, k, s1, s2, clen, use_atr, close, high, low, atr_idx, ma_idx, tr_i
         cond_l, cond_s, pprice, sprice, atr = get_signal(
             data[i - start_pos:i + 1], price_t, k, s1, s2, 
             clen, use_atr, atr_idx, ma_idx, tr_idx)
+        data[i, sig_idx] = cond_l - cond_s  # Store signal in the row
         # Stop loss hit
         if mp > 0 and row[low] <= sss:
             trans.append([mp, enpp, sss, entt, i, 0])
@@ -98,21 +103,11 @@ def _v4_(data, k, s1, s2, clen, use_atr, close, high, low, atr_idx, ma_idx, tr_i
                 entt, enpp = i, price_t
                 ppp, sss = pprice, sprice
                 mp = -1
-    return trans
+    return data, trans
 
 
-def search(df, k, s1, s2, clen, use_atr=True, adx_min=25, ma_slope_min=0.5):
-    """
-    Enhanced strategy function with stricter parameters
-    Parameters:
-    - k: ATR multiplier for entry
-    - s1: Initial stop loss ATR multiplier
-    - s2: Take profit ATR multiplier
-    - clen: Look back period
-    - use_atr: Whether to use ATR for price levels (default True)
-    - adx_min: Minimum ADX value to confirm trend (default 25)
-    - ma_slope_min: Minimum MA slope to confirm trend direction (default 0.5)
-    """
+def search(df, k, s1, s2, clen, use_atr=False):
+    df['signal'] = 0  # 初始化信号列
     columns = df.columns.to_list()
     data = df.values
     close = columns.index('close')
@@ -121,5 +116,8 @@ def search(df, k, s1, s2, clen, use_atr=True, adx_min=25, ma_slope_min=0.5):
     ma_idx = columns.index('MA')
     tr_idx = columns.index('TR')
     atr_idx = columns.index('ATR')
-    return _v4_(data, k, s1, s2, clen, use_atr,
-               close, high, low, atr_idx, ma_idx, tr_idx)
+    sig_idx = columns.index('signal')
+    data, trans = _v4_(
+        data, k, s1, s2, clen, use_atr, close,
+        high, low, atr_idx, ma_idx, tr_idx, sig_idx)
+    return pd.DataFrame(data, columns=columns), trans
